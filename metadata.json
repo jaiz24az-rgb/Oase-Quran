@@ -1,0 +1,10 @@
+{
+  "name": "Tarjih Muhammadiyah: Sholat, Kiblat, Al-Qur'an & KHGT",
+  "description": "Aplikasi pengingat sholat hisab Tarjih Muhammadiyah (Subuh -18°), penunjuk arah kiblat presisi, dzikir pagi & petang, kumpulan doa Al-Qur'an & Hadits, doa sholat HPT, modul hafalan, Al-Qur'an tajwid digital Indonesia, dan Kalender Hijriah Global Tunggal (KHGT).",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

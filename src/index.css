@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@layer utilities {
+  /* Standar Huruf Al-Qur'an Indonesia (Kemenag RI / Mushaf Standar Indonesia) */
+  /* Menggunakan Scheherazade New yang dioptimalkan khusus untuk rasm Usmani & harakat standar Indonesia */
+  .font-quran,
+  .font-quran-indonesia {
+    font-family: 'Scheherazade New', 'Amiri', 'Traditional Arabic', 'KFGQPC Uthmanic Script HAFS', serif;
+    font-feature-settings: "cv01" on, "cv02" on, "calt" on;
+    line-height: 2.4;
+    letter-spacing: 0.015em;
+  }
+
+  .font-quran-amiri {
+    font-family: 'Amiri', 'Scheherazade New', serif;
+    line-height: 2.3;
+  }
+
+  .font-quran-lateef {
+    font-family: 'Lateef', 'Scheherazade New', serif;
+    line-height: 2.2;
+  }
+}

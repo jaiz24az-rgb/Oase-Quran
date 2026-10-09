@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Teal-Emerald Gradient for the Crescent Moon -->
+    <linearGradient id="oase-teal-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="30%" stop-color="#0d9488"/>
+      <stop offset="65%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+
+    <!-- Warm Golden Gradient for Inner Spiritual Flame -->
+    <linearGradient id="oase-gold-grad" x1="25%" y1="0%" x2="75%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="30%" stop-color="#f59e0b"/>
+      <stop offset="70%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+
+    <!-- Emerald Dark Gradient for alternative dark app icon -->
+    <linearGradient id="bg-emerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="60%" stop-color="#022c22"/>
+      <stop offset="100%" stop-color="#011b15"/>
+    </linearGradient>
+
+    <filter id="icon-soft-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#064e3b" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  
+
+  <!-- Emblem Center Group (scaled to breathe inside squircle or stand alone) -->
+  <g transform="translate(256, 256) scale(0.94) translate(-256, -256)" filter="none">
+    <!-- CRESCENT MOON (HILAL) -->
+    <!-- Elegantly wraps around from top slender tip down and around to right tapered tip -->
+    <path d="
+      M 276, 28
+      C 272, 28 266, 31 261, 35
+      C 152, 62 70, 160 70, 276
+      C 70, 396 166, 492 286, 492
+      C 362, 492 430, 452 468, 392
+      C 469, 390 467, 386 464, 384
+      C 453, 376 439, 356 439, 338
+      C 439, 332 443, 325 448, 318
+      C 450, 315 446, 312 443, 314
+      C 418, 334 386, 346 352, 348
+      C 232, 356 138, 260 138, 148
+      C 138, 102 154, 62 186, 32
+      C 192, 26 204, 21 216, 20
+      C 220, 19 278, 27 276, 28 Z
+    " fill="url(#oase-teal-grad)"/>
+
+    <!-- INNER GOLDEN FLAME MOTIF (Spiritual Light / Water-drop) -->
+    <!-- Left swirling golden wing -->
+    <path d="
+      M 288, 86
+      C 288, 86 258, 168 244, 210
+      C 234, 238 230, 266 238, 294
+      C 248, 328 276, 354 310, 362
+      C 342, 370 376, 358 398, 334
+      C 384, 340 366, 342 348, 338
+      C 316, 328 294, 304 286, 274
+      C 278, 246 286, 216 302, 186
+      C 316, 160 322, 128 318, 102
+      C 316, 92 300, 82 288, 86 Z
+    " fill="url(#oase-gold-grad)"/>
+
+    <!-- Center golden flame petal -->
+    <path d="
+      M 312, 136
+      C 312, 136 286, 194 282, 230
+      C 278, 260 290, 290 314, 308
+      C 334, 322 360, 320 378, 308
+      C 364, 308 350, 302 338, 290
+      C 322, 274 316, 248 322, 224
+      C 328, 198 346, 180 352, 156
+      C 356, 142 348, 130 334, 130
+      C 324, 130 318, 132 312, 136 Z
+    " fill="url(#oase-gold-grad)"/>
+
+    <!-- Right base accent of the flame -->
+    <path d="
+      M 230, 232
+      C 220, 256 218, 282 226, 308
+      C 236, 350 272, 382 316, 392
+      C 350, 400 388, 394 416, 374
+      C 388, 386 354, 388 324, 380
+      C 286, 368 256, 332 248, 296
+      C 244, 278 244, 258 248, 240
+      C 249, 236 233, 226 230, 232 Z
+    " fill="url(#oase-gold-grad)" opacity="0.9"/>
+  </g>
+</svg>

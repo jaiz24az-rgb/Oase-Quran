@@ -1,0 +1,38 @@
+{
+  "name": "Oase-Muslim: Aplikasi Muslim Terpadu",
+  "short_name": "Oase-Muslim",
+  "description": "Oase-Muslim: Aplikasi Muslim Terpadu - Pengingat waktu sholat hisab astronomis akurat, penunjuk arah kiblat peta satelit, dzikir & doa harian, modul hafalan audio metode Ummi, Al-Qur'an tajwid berwarna Indonesia, dan Kalender Hijriah Global Tunggal (KHGT).",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#064e3b",
+  "theme_color": "#065f46",
+  "categories": ["lifestyle", "utilities", "education"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
