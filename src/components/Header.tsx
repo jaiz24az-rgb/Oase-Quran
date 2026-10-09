@@ -14,7 +14,6 @@ import {
   Layers,
   FileDown,
   Download,
-  ArrowRight,
 } from 'lucide-react';
 import { HijriDateInfo, getKhgtHijriDate } from '../utils/khgtCalendar';
 import { LocationConfig, AppTab } from '../types';
@@ -96,21 +95,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right side: Location, Next Prayer, Install App, PDF, Settings */}
         <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-          {/* Quick Hafal SHQ Button in Header Top Bar */}
-          <button
-            id="header-quick-shq-btn"
-            onClick={() => setActiveTab('quran-memorize-shq')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs ${
-              activeTab === 'quran-memorize-shq'
-                ? 'bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300'
-                : 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/70 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-700'
-            }`}
-            title="Buka Metode Hafal Qur'an SHQ Terpandu (20-45 Menit Sehari)"
-          >
-            <Brain className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            <span className="font-extrabold">Hafal SHQ</span>
-          </button>
-
           {/* Location button */}
           <button
             id="header-location-btn"
@@ -332,32 +316,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
       </div>
-
-      {/* Prominent High-Visibility Hafal SHQ Banner (Visible across all tabs except when already on SHQ) */}
-      {activeTab !== 'quran-memorize-shq' && (
-        <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 px-3 sm:px-6 py-2 border-t border-b border-amber-600/30 flex items-center justify-between gap-2 shadow-xs">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-lg bg-slate-950 text-amber-300 text-xs shadow-xs font-black">
-              🧠
-            </span>
-            <div className="text-xs truncate">
-              <span className="font-black text-slate-950">Metode Hafal Qur'an (SHQ):</span>
-              <span className="hidden xs:inline text-slate-900 ml-1 font-semibold">20–45 Mnt/hari (Anti Ember Bocor)</span>
-            </div>
-          </div>
-          <button
-            id="header-banner-btn-shq"
-            onClick={() => {
-              setActiveTab('quran-memorize-shq');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="shrink-0 px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 active:bg-black text-amber-300 hover:text-white font-black text-xs shadow-sm flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer ring-1 ring-amber-300/40"
-          >
-            <span>Buka Hafal SHQ</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
     </header>
   );
 };

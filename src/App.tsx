@@ -367,24 +367,21 @@ export default function App() {
           <span>Al-Qur'an</span>
         </button>
 
-        {/* Hafal SHQ - Prominently Highlighted with Golden/Amber Fill & Pulsing Badge */}
+        {/* Hafal SHQ */}
         <button
           id="mobile-bottom-nav-shq"
           onClick={() => {
             setActiveTab('quran-memorize-shq');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-2xl text-[10px] font-black transition-all cursor-pointer active:scale-95 ${
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
             activeTab === 'quran-memorize-shq'
-              ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-amber-300'
-              : 'bg-amber-400/90 hover:bg-amber-400 text-slate-950 shadow-sm border border-amber-500 ring-2 ring-amber-400/30'
+              ? 'text-amber-600 dark:text-amber-400 font-extrabold'
+              : 'text-slate-500 dark:text-slate-400 hover:text-amber-600'
           }`}
         >
-          <Brain className="w-5 h-5 mb-0.5 text-slate-950" />
+          <Brain className="w-5 h-5 mb-0.5" />
           <span>Hafal SHQ</span>
-          <span className="absolute -top-1.5 -right-1 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full uppercase shadow-xs animate-bounce">
-            BARU
-          </span>
         </button>
 
         {/* Kalender */}

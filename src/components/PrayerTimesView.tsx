@@ -184,69 +184,6 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
         </div>
       </div>
 
-      {/* QUICK SHORTCUTS GRID - Menu Pintas Langsung Terlihat di HP & Desktop */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        {/* Shortcut 1: Waktu Sholat */}
-        <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border-2 border-emerald-500 shadow-xs flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Aktif</div>
-            <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">Waktu Sholat</div>
-          </div>
-        </div>
-
-        {/* Shortcut 2: Arah Kiblat */}
-        <button
-          onClick={() => setShowEmbeddedQibla(!showEmbeddedQibla)}
-          className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-500 shadow-xs flex items-center gap-2.5 text-left transition-all active:scale-95 cursor-pointer"
-        >
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/70 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center justify-center shrink-0">
-            <Compass className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">1-Tap</div>
-            <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">Arah Kiblat</div>
-          </div>
-        </button>
-
-        {/* Shortcut 3: Al-Qur'an Indonesia */}
-        <button
-          onClick={onOpenQuran}
-          className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-400 shadow-xs flex items-center gap-2.5 text-left transition-all active:scale-95 cursor-pointer"
-        >
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center shrink-0">
-            <BookOpen className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Mushaf</div>
-            <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">Al-Qur'an</div>
-          </div>
-        </button>
-
-        {/* Shortcut 4: Hafal Qur'an SHQ - Bright Amber Feature Button */}
-        <button
-          id="quick-grid-shq-btn"
-          onClick={onOpenSHQ}
-          className="p-3 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-400 active:from-amber-500 text-slate-950 border-2 border-amber-500 shadow-md flex items-center gap-2.5 text-left transition-all active:scale-95 cursor-pointer ring-2 ring-amber-400/40"
-        >
-          <div className="w-9 h-9 rounded-xl bg-slate-950 text-amber-300 flex items-center justify-center shrink-0 shadow-xs">
-            <Brain className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1">
-              <span>HAFAL SHQ</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping inline-block" />
-            </div>
-            <div className="text-xs sm:text-sm font-black text-slate-950 truncate flex items-center gap-1">
-              <span>Mulai 20 Mnt</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        </button>
-      </div>
-
       {/* Hero Card: Next Prayer & Countdown */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-900 text-white p-6 sm:p-8 shadow-lg">
         {/* Subtle decorative geometric overlay */}
