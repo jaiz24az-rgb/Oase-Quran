@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Compass, BookOpen, Brain, Calendar } from 'lucide-react';
+import { Clock, Compass, BookOpen, BookmarkCheck, Calendar } from 'lucide-react';
 import { Header } from './components/Header';
 import { PrayerTimesView } from './components/PrayerTimesView';
 import { QiblaCompassView } from './components/QiblaCompassView';
@@ -7,8 +7,6 @@ import { TarjihPrayersView } from './components/TarjihPrayersView';
 import { DzikirDoaView } from './components/DzikirDoaView';
 import { MemorizeView } from './components/MemorizeView';
 import { QuranView } from './components/QuranView';
-import { QuranMappingView } from './components/QuranMappingView';
-import { QuranMemorizeSHQView } from './components/QuranMemorizeSHQView';
 import { KhgtCalendarView } from './components/KhgtCalendarView';
 import { LocationModal } from './components/LocationModal';
 import { SettingsModal } from './components/SettingsModal';
@@ -270,49 +268,21 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'quran' && (
+        {(activeTab === 'quran' || activeTab === 'quran-mapping' || activeTab === 'quran-memorize-shq') && (
           <QuranView
-            initialSurahNumber={selectedSurahForQuran}
+            initialSurahNumber={
+              activeTab === 'quran-mapping' ? selectedSurahForMapping : selectedSurahForQuran
+            }
+            initialMode={
+              activeTab === 'quran-mapping' ? 'mapping' : activeTab === 'quran-memorize-shq' ? 'shq' : 'mushaf'
+            }
             onOpenQuranMapping={handleOpenQuranMapping}
             onOpenQuranMemorize={handleOpenQuranMemorize}
           />
         )}
 
-        {activeTab === 'quran-mapping' && (
-          <QuranMappingView
-            initialSurahNumber={selectedSurahForMapping}
-            onNavigateToQuran={handleNavigateToQuran}
-          />
-        )}
-
-        {activeTab === 'quran-memorize-shq' && (
-          <QuranMemorizeSHQView
-            initialSurahNumber={selectedSurahForQuran}
-            onNavigateToQuran={handleNavigateToQuran}
-            onClose={() => setActiveTab('quran')}
-          />
-        )}
-
         {activeTab === 'khgt' && <KhgtCalendarView />}
       </main>
-
-      {/* Floating Quick Shortcut to Hafal SHQ for Desktop */}
-      {activeTab !== 'quran-memorize-shq' && (
-        <aside aria-label="Akses Cepat Hafal SHQ" className="hidden sm:block fixed bottom-6 right-6 z-30">
-          <button
-            id="floating-shq-quick-btn"
-            onClick={() => {
-              setActiveTab('quran-memorize-shq');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:from-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-xl ring-2 ring-white/60 dark:ring-slate-900/60 hover:scale-105 active:scale-95 transition-all cursor-pointer"
-            title="Buka Metode Hafal Qur'an SHQ (20-45 Menit Sehari)"
-          >
-            <Brain className="w-4 h-4 text-slate-950" />
-            <span className="font-extrabold">Hafal Qur'an (SHQ)</span>
-          </button>
-        </aside>
-      )}
 
       {/* Fixed Bottom Navigation Bar for Mobile Phones (Always in View Under Thumb) */}
       <nav
@@ -358,7 +328,7 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-            activeTab === 'quran'
+            activeTab === 'quran' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-mapping'
               ? 'text-emerald-600 dark:text-emerald-400 font-extrabold'
               : 'text-slate-500 dark:text-slate-400'
           }`}
@@ -367,21 +337,21 @@ export default function App() {
           <span>Al-Qur'an</span>
         </button>
 
-        {/* Hafal SHQ */}
+        {/* Doa */}
         <button
-          id="mobile-bottom-nav-shq"
+          id="mobile-bottom-nav-doa"
           onClick={() => {
-            setActiveTab('quran-memorize-shq');
+            setActiveTab('tarjih-prayers');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-            activeTab === 'quran-memorize-shq'
-              ? 'text-amber-600 dark:text-amber-400 font-extrabold'
-              : 'text-slate-500 dark:text-slate-400 hover:text-amber-600'
+            activeTab === 'tarjih-prayers' || activeTab === 'dzikir-doa' || activeTab === 'memorize'
+              ? 'text-emerald-600 dark:text-emerald-400 font-extrabold'
+              : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <Brain className="w-5 h-5 mb-0.5" />
-          <span>Hafal SHQ</span>
+          <BookmarkCheck className="w-5 h-5 mb-0.5" />
+          <span>Doa</span>
         </button>
 
         {/* Kalender */}

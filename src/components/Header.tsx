@@ -206,12 +206,12 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* TAB 2: Al-Qur'an Indonesia */}
+          {/* TAB 2: Al-Qur'an Indonesia (Berkumpul: Mushaf, Hafal SHQ, Quran Mapping) */}
           <button
             id="nav-tab-quran"
             onClick={() => setActiveTab('quran')}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === 'quran'
+              activeTab === 'quran' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-mapping'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
@@ -220,39 +220,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Al-Qur'an Indonesia</span>
           </button>
 
-          {/* TAB 3: Hafal Qur'an (SHQ) - Dedicated & Prominent Tab */}
-          <button
-            id="nav-tab-shq"
-            onClick={() => setActiveTab('quran-memorize-shq')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer shadow-xs ${
-              activeTab === 'quran-memorize-shq'
-                ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-amber-300 font-black'
-                : 'bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-700/80'
-            }`}
-            title="Buka Metode Hafal Qur'an SHQ (20-45 Menit Sehari)"
-          >
-            <Brain className="w-4 h-4 text-amber-600 dark:text-amber-400 fill-amber-400/20" />
-            <span>Hafal Qur'an (SHQ)</span>
-            <span className="text-[10px] bg-amber-500/20 text-amber-900 dark:text-amber-200 px-1.5 py-0.5 rounded-full font-extrabold uppercase">
-              20 Mnt
-            </span>
-          </button>
-
-          {/* TAB 3: Kalender KHGT (Shifted right after Al-Qur'an) */}
-          <button
-            id="nav-tab-khgt"
-            onClick={() => setActiveTab('khgt')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === 'khgt'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            <span>Kalender KHGT</span>
-          </button>
-
-          {/* TAB 4: Doa & Sholat + 1-Tap Hafalan */}
+          {/* TAB 3: Doa & Sholat + 1-Tap Hafalan */}
           <div
             className={`flex items-center rounded-lg transition-all ${
               activeTab === 'tarjih-prayers' || activeTab === 'memorize'
@@ -287,7 +255,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* TAB 5: Dzikir & Doa */}
+          {/* TAB 4: Dzikir & Doa */}
           <button
             id="nav-tab-dzikir-doa"
             onClick={() => setActiveTab('dzikir-doa')}
@@ -301,18 +269,18 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Dzikir & Doa</span>
           </button>
 
-          {/* TAB 6: Quran Mapping */}
+          {/* TAB 5: Kalender KHGT */}
           <button
-            id="nav-tab-quran-mapping"
-            onClick={() => setActiveTab('quran-mapping')}
+            id="nav-tab-khgt"
+            onClick={() => setActiveTab('khgt')}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === 'quran-mapping'
+              activeTab === 'khgt'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
-            <Layers className="w-4 h-4" />
-            <span>Quran Mapping</span>
+            <Calendar className="w-4 h-4" />
+            <span>Kalender KHGT</span>
           </button>
         </nav>
       </div>

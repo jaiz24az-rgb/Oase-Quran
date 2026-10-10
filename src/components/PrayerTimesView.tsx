@@ -346,57 +346,6 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
         )}
       </div>
 
-      {/* 1-Tap Hafal Qur'an SHQ & Al-Qur'an Card */}
-      <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 border border-emerald-500/30 shadow-md p-4 sm:p-5 text-white">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-md font-black">
-              <Brain className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  Metode Hafal Qur'an SHQ
-                </span>
-                <span className="text-[11px] text-emerald-300 font-bold">
-                  20–45 Menit Sehari (Anti Ember Bocor)
-                </span>
-              </div>
-              <h3 className="font-bold text-sm sm:text-base text-white mt-0.5">
-                Sistem Hafal Terpandu: 4 Langkah & Jam Retensi Otomatis
-              </h3>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Dirancang khusus untuk orang dewasa: jangkar visual mushaf, murottal berulang, uji active recall, dan muraja'ah terjadwal.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            {onOpenSHQ && (
-              <button
-                id="home-btn-open-shq"
-                onClick={onOpenSHQ}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-md transition-all cursor-pointer hover:scale-102 shrink-0"
-              >
-                <Brain className="w-4 h-4 text-slate-950" />
-                <span>Buka Hafal SHQ</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            )}
-
-            {onOpenQuran && (
-              <button
-                onClick={onOpenQuran}
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all cursor-pointer shrink-0"
-              >
-                <BookOpen className="w-4 h-4 text-emerald-300" />
-                <span>Baca Al-Qur'an</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Tarjih Subuh -18° Special Notice */}
       <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm">
         <Info className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />

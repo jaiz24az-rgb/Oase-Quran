@@ -4,18 +4,23 @@ import { SURAH_LIST, fetchSurahVerses, LOCAL_SURAHS_MAP } from '../data/quranDat
 import { QuranAyah, QuranSurah } from '../types';
 import { renderTajwidText, TAJWID_RULES } from '../utils/tajwidHighlighter';
 import { SynchronizedArabicText } from './SynchronizedArabicText';
+import { QuranMappingView } from './QuranMappingView';
+import { QuranMemorizeSHQView } from './QuranMemorizeSHQView';
 
 interface QuranViewProps {
   initialSurahNumber?: number;
+  initialMode?: 'mushaf' | 'shq' | 'mapping';
   onOpenQuranMapping?: (surahNumber: number) => void;
   onOpenQuranMemorize?: (surahNumber: number) => void;
 }
 
 export const QuranView: React.FC<QuranViewProps> = ({
   initialSurahNumber,
+  initialMode = 'mushaf',
   onOpenQuranMapping,
   onOpenQuranMemorize,
 }) => {
+  const [viewMode, setViewMode] = useState<'mushaf' | 'shq' | 'mapping'>(initialMode);
   const [selectedSurah, setSelectedSurah] = useState<QuranSurah>(() => {
     if (initialSurahNumber) {
       return SURAH_LIST.find((s) => s.number === initialSurahNumber) || SURAH_LIST[0];
@@ -61,6 +66,13 @@ export const QuranView: React.FC<QuranViewProps> = ({
       if (found) setSelectedSurah(found);
     }
   }, [initialSurahNumber]);
+
+  // Sync with initialMode when it changes
+  useEffect(() => {
+    if (initialMode) {
+      setViewMode(initialMode);
+    }
+  }, [initialMode]);
 
   // Settings
   const [enableTajwid, setEnableTajwid] = useState<boolean>(true);
@@ -306,8 +318,92 @@ export const QuranView: React.FC<QuranViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Quran Header Toolbar */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* 3-Segment Sub-Nav: Bersatu di Al-Qur'an Indonesia (Mushaf, Hafal SHQ, Quran Mapping) */}
+      <div className="bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between gap-1.5">
+        <button
+          id="quran-mode-mushaf"
+          onClick={() => {
+            setViewMode('mushaf');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            viewMode === 'mushaf'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Mushaf & Terjemahan</span>
+        </button>
+
+        <button
+          id="quran-mode-shq"
+          onClick={() => {
+            setViewMode('shq');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            viewMode === 'shq'
+              ? 'bg-amber-400 text-slate-950 shadow-xs ring-1 ring-amber-300 font-extrabold'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70'
+          }`}
+        >
+          <Brain className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          <span>Hafal Qur'an (SHQ)</span>
+        </button>
+
+        <button
+          id="quran-mode-mapping"
+          onClick={() => {
+            setViewMode('mapping');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            viewMode === 'mapping'
+              ? 'bg-teal-600 text-white shadow-xs font-extrabold'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70'
+          }`}
+        >
+          <Layers className="w-4 h-4 text-teal-500 dark:text-teal-400" />
+          <span>Quran Mapping</span>
+        </button>
+      </div>
+
+      {/* Mode 1: Hafal Qur'an SHQ (Terpadu di Al-Qur'an Indonesia) */}
+      {viewMode === 'shq' && (
+        <QuranMemorizeSHQView
+          initialSurahNumber={selectedSurah.number}
+          onNavigateToQuran={(surahNum) => {
+            const s = SURAH_LIST.find((item) => item.number === surahNum);
+            if (s) setSelectedSurah(s);
+            setViewMode('mushaf');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onClose={() => {
+            setViewMode('mushaf');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {/* Mode 2: Quran Mapping (Terpadu di Al-Qur'an Indonesia) */}
+      {viewMode === 'mapping' && (
+        <QuranMappingView
+          initialSurahNumber={selectedSurah.number}
+          onNavigateToQuran={(surahNum) => {
+            const s = SURAH_LIST.find((item) => item.number === surahNum);
+            if (s) setSelectedSurah(s);
+            setViewMode('mushaf');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {/* Mode 3: Mushaf & Terjemahan */}
+      {viewMode === 'mushaf' && (
+        <>
+          {/* Quran Header Toolbar */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold text-xs sm:text-sm uppercase tracking-wider">
             <BookOpen className="w-4 h-4" />
@@ -335,29 +431,25 @@ export const QuranView: React.FC<QuranViewProps> = ({
           )}
 
           {/* Open Quran Mapping for this Surah */}
-          {onOpenQuranMapping && (
-            <button
-              onClick={() => onOpenQuranMapping(selectedSurah.number)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-              title="Buka 5 pilar kandungan & hikmah surah ini di Quran Mapping"
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Quran Mapping</span>
-            </button>
-          )}
+          <button
+            onClick={() => setViewMode('mapping')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            title="Buka 5 pilar kandungan & hikmah surah ini di Quran Mapping"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Quran Mapping</span>
+          </button>
 
-          {/* Open Quran Memorize SHQ for this Surah - Eye-Catching Amber Pill */}
-          {onOpenQuranMemorize && (
-            <button
-              id="quran-toolbar-btn-shq"
-              onClick={() => onOpenQuranMemorize(selectedSurah.number)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-sm ring-1 ring-amber-300 transition-all cursor-pointer hover:scale-102 active:scale-98"
-              title="Hafalkan surah ini dengan Metode SHQ (20-45 menit sehari)"
-            >
-              <Brain className="w-3.5 h-3.5 text-slate-950" />
-              <span>Hafal (SHQ)</span>
-            </button>
-          )}
+          {/* Open Quran Memorize SHQ for this Surah */}
+          <button
+            id="quran-toolbar-btn-shq"
+            onClick={() => setViewMode('shq')}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-sm ring-1 ring-amber-300 transition-all cursor-pointer hover:scale-102 active:scale-98"
+            title="Hafalkan surah ini dengan Metode SHQ (20-45 menit sehari)"
+          >
+            <Brain className="w-3.5 h-3.5 text-slate-950" />
+            <span>Hafal (SHQ)</span>
+          </button>
 
           {/* Tajwid Color Toggle */}
           <button
@@ -448,43 +540,6 @@ export const QuranView: React.FC<QuranViewProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Prominent Quick-Start SHQ Memorize Banner */}
-      {onOpenQuranMemorize && (
-        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 border border-emerald-500/40 text-white p-4 sm:p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-md font-black">
-              <Brain className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  Metode Hafal SHQ (20–45 Menit)
-                </span>
-                <span className="text-[11px] text-emerald-300 font-semibold">
-                  Anti Ember Bocor
-                </span>
-              </div>
-              <h3 className="text-sm sm:text-base font-black text-white mt-1">
-                Ingin Menghafal Surah {selectedSurah.englishName} ({selectedSurah.numberOfAyahs} Ayat)?
-              </h3>
-              <p className="text-xs text-slate-300 max-w-xl">
-                Gunakan 4 langkah terpandu: Petakan lokasi mushaf, murottal berulang, uji ingatan aktif (active recall), dan jam retensi otomatis.
-              </p>
-            </div>
-          </div>
-
-          <button
-            id="quran-banner-btn-shq"
-            onClick={() => onOpenQuranMemorize(selectedSurah.number)}
-            className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:scale-102 active:scale-98 transition-all cursor-pointer shrink-0"
-          >
-            <Brain className="w-4 h-4 text-slate-950" />
-            <span>Mulai Hafal Surah Ini</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Tajwid Guide Panel (Collapsible) */}
       {showTajwidGuide && (
@@ -882,6 +937,8 @@ export const QuranView: React.FC<QuranViewProps> = ({
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* Modal for selecting Surah directly without having to scroll down */}
       {showSurahModal && (
