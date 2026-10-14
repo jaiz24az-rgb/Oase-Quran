@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Compass, BookOpen, BookmarkCheck, Calendar } from 'lucide-react';
+import { Clock, Compass, BookOpen, BookmarkCheck, Calendar, Eye, EyeOff } from 'lucide-react';
 import { Header } from './components/Header';
 import { PrayerTimesView } from './components/PrayerTimesView';
 import { QiblaCompassView } from './components/QiblaCompassView';
@@ -78,6 +78,34 @@ export default function App() {
   const [nextPrayer, setNextPrayer] = useState<NextPrayerInfo | null>(() =>
     getNextPrayerInfo(prayerTimes, new Date())
   );
+
+  // Compact landscape detection (smartphones & small tablets rotated horizontally)
+  const [isCompactLandscape, setIsCompactLandscape] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(orientation: landscape) and (max-height: 560px)').matches;
+  });
+  const [showMenusInLandscape, setShowMenusInLandscape] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(orientation: landscape) and (max-height: 560px)');
+    const check = () => {
+      setIsCompactLandscape(media.matches);
+      if (media.matches) {
+        setShowMenusInLandscape(false);
+      }
+    };
+    check();
+    media.addEventListener('change', check);
+    window.addEventListener('resize', check);
+    return () => {
+      media.removeEventListener('change', check);
+      window.removeEventListener('resize', check);
+    };
+  }, []);
+
+  // When in compact landscape, menus are auto-hidden by default to maximize reading viewport
+  const isLandscapeFullscreen = isCompactLandscape && !showMenusInLandscape;
 
   // Track triggered prayer times today to avoid repeat notifications within the same minute
   const triggeredTimesRef = useRef<Set<string>>(new Set());
@@ -195,30 +223,53 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100/70 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors selection:bg-emerald-500 selection:text-white">
-      {/* Top Navigation & Status Bar */}
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        location={location}
-        onOpenLocationModal={() => setIsLocationModalOpen(true)}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onOpenExportPdf={() => setIsExportPdfModalOpen(true)}
-        onOpenInstallModal={() => setIsInstallModalOpen(true)}
-        onOpenQibla={() => {
-          setActiveTab('prayer-times');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenMemorize={() => {
-          setActiveTab('tarjih-prayers');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        nextPrayer={nextPrayer}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-      />
+      {/* Floating Menu Toggle for Landscape Mode on Phones (Auto-hide for full Mushaf reading) */}
+      {isCompactLandscape && (
+        <button
+          onClick={() => setShowMenusInLandscape(!showMenusInLandscape)}
+          className="fixed top-2 right-2 z-50 bg-slate-900/85 hover:bg-slate-900 text-white dark:bg-slate-800/90 dark:hover:bg-slate-700 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-xl border border-white/20 transition-all cursor-pointer animate-in fade-in"
+          title={showMenusInLandscape ? 'Sembunyikan menu agar layar mushaf luas & penuh' : 'Tampilkan menu navigasi aplikasi'}
+        >
+          {showMenusInLandscape ? (
+            <>
+              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <span>Sembunyikan Menu</span>
+            </>
+          ) : (
+            <>
+              <Eye className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Menu Layar</span>
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Top Navigation & Status Bar (Auto-hidden in landscape phone view) */}
+      <div className={isLandscapeFullscreen ? 'hidden' : 'block'}>
+        <Header
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          location={location}
+          onOpenLocationModal={() => setIsLocationModalOpen(true)}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+          onOpenExportPdf={() => setIsExportPdfModalOpen(true)}
+          onOpenInstallModal={() => setIsInstallModalOpen(true)}
+          onOpenQibla={() => {
+            setActiveTab('prayer-times');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenMemorize={() => {
+            setActiveTab('tarjih-prayers');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          nextPrayer={nextPrayer}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        />
+      </div>
 
       {/* Main Content Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 sm:pb-12">
+      <main className={`flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 transition-all ${isLandscapeFullscreen ? 'py-1 pb-4' : 'py-6 pb-28 sm:pb-12'}`}>
         {activeTab === 'prayer-times' && (
           <PrayerTimesView
             prayerTimes={prayerTimes}
@@ -278,16 +329,17 @@ export default function App() {
             }
             onOpenQuranMapping={handleOpenQuranMapping}
             onOpenQuranMemorize={handleOpenQuranMemorize}
+            isLandscapeFullscreen={isLandscapeFullscreen}
           />
         )}
 
         {activeTab === 'khgt' && <KhgtCalendarView />}
       </main>
 
-      {/* Fixed Bottom Navigation Bar for Mobile Phones (Always in View Under Thumb) */}
+      {/* Fixed Bottom Navigation Bar for Mobile Phones (Auto-hidden in landscape phone view) */}
       <nav
         aria-label="Navigasi Bawah Layar HP"
-        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-xl px-1.5 py-1.5 flex items-center justify-around"
+        className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-xl px-1.5 py-1.5 items-center justify-around ${isLandscapeFullscreen ? 'hidden' : 'flex'}`}
       >
         {/* Sholat */}
         <button

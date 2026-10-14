@@ -13,6 +13,7 @@ interface QuranViewProps {
   initialMode?: 'mushaf' | 'shq' | 'mapping';
   onOpenQuranMapping?: (surahNumber: number) => void;
   onOpenQuranMemorize?: (surahNumber: number) => void;
+  isLandscapeFullscreen?: boolean;
 }
 
 export const QuranView: React.FC<QuranViewProps> = ({
@@ -20,7 +21,29 @@ export const QuranView: React.FC<QuranViewProps> = ({
   initialMode = 'mushaf',
   onOpenQuranMapping,
   onOpenQuranMemorize,
+  isLandscapeFullscreen,
 }) => {
+  // Check if device is in compact landscape mode (phone rotated horizontally)
+  const [internalCompactLandscape, setInternalCompactLandscape] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(orientation: landscape) and (max-height: 560px)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(orientation: landscape) and (max-height: 560px)');
+    const check = () => setInternalCompactLandscape(media.matches);
+    check();
+    media.addEventListener('change', check);
+    window.addEventListener('resize', check);
+    return () => {
+      media.removeEventListener('change', check);
+      window.removeEventListener('resize', check);
+    };
+  }, []);
+
+  const isLandscapeCompact = isLandscapeFullscreen ?? internalCompactLandscape;
+
   const [viewMode, setViewMode] = useState<'mushaf' | 'shq' | 'mapping'>(initialMode);
   const [selectedSurah, setSelectedSurah] = useState<QuranSurah>(() => {
     if (initialSurahNumber) {
@@ -325,15 +348,26 @@ export const QuranView: React.FC<QuranViewProps> = ({
   });
 
   const getFontSizeClass = () => {
-    if (arabicFontSize === 'normal') return 'text-xl sm:text-2xl lg:text-3xl leading-loose landscape:leading-relaxed';
-    if (arabicFontSize === 'xlarge') return 'text-3xl sm:text-4xl lg:text-5xl leading-loose landscape:leading-relaxed';
-    return 'text-2xl sm:text-3xl lg:text-4xl leading-loose landscape:leading-relaxed'; // large
+    if (arabicFontSize === 'normal') {
+      return isLandscapeCompact
+        ? 'text-lg sm:text-xl leading-normal tracking-normal'
+        : 'text-xl sm:text-2xl lg:text-3xl leading-loose';
+    }
+    if (arabicFontSize === 'xlarge') {
+      return isLandscapeCompact
+        ? 'text-2xl sm:text-3xl leading-normal tracking-normal'
+        : 'text-3xl sm:text-4xl lg:text-5xl leading-loose';
+    }
+    // large (default)
+    return isLandscapeCompact
+      ? 'text-xl sm:text-2.5xl leading-normal tracking-normal'
+      : 'text-2xl sm:text-3xl lg:text-4xl leading-loose';
   };
 
   return (
-    <div className="space-y-6">
-      {/* 3-Segment Sub-Nav: Bersatu di Al-Qur'an Indonesia (Mushaf, Hafal SHQ, Quran Mapping) */}
-      <div className="bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between gap-1.5">
+    <div className={`transition-all ${isLandscapeCompact ? 'space-y-2' : 'space-y-6'}`}>
+      {/* 3-Segment Sub-Nav: Hidden in compact landscape to maximize reading viewport */}
+      <div className={`bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs items-center justify-between gap-1.5 ${isLandscapeCompact ? 'hidden' : 'flex'}`}>
         <button
           id="quran-mode-mushaf"
           onClick={() => {
@@ -416,8 +450,8 @@ export const QuranView: React.FC<QuranViewProps> = ({
       {/* Mode 3: Mushaf & Terjemahan */}
       {viewMode === 'mushaf' && (
         <>
-          {/* Quran Header Toolbar */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          {/* Quran Header Toolbar (Hidden in compact landscape to maximize reading space) */}
+          <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isLandscapeCompact ? 'hidden' : 'p-5 flex'}`}>
         <div>
           <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold text-xs sm:text-sm uppercase tracking-wider">
             <BookOpen className="w-4 h-4" />
@@ -590,12 +624,12 @@ export const QuranView: React.FC<QuranViewProps> = ({
         </div>
       )}
 
-      {/* Quick Surah Navigator Bar: Immediately visible at top, no vertical scrolling needed */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-2.5 sm:p-3.5 border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between gap-2">
+      {/* Quick Surah Navigator Bar: Immediately visible at top, compact in landscape */}
+      <div className={`bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between gap-1.5 ${isLandscapeCompact ? 'p-1' : 'p-2.5 sm:p-3.5'}`}>
         <button
           onClick={handlePrevSurah}
           disabled={selectedSurah.number <= 1}
-          className="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer shrink-0"
+          className={`rounded-lg sm:rounded-xl text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer shrink-0 ${isLandscapeCompact ? 'px-2 py-1' : 'px-2.5 sm:px-3 py-2'}`}
           title="Surah Sebelumnya"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -604,11 +638,11 @@ export const QuranView: React.FC<QuranViewProps> = ({
 
         <button
           onClick={() => setShowSurahModal(true)}
-          className="flex-1 max-w-lg mx-auto flex items-center justify-between gap-2 sm:gap-3 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100/90 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-100 transition-colors cursor-pointer group"
+          className={`flex-1 max-w-lg mx-auto flex items-center justify-between gap-2 px-2.5 rounded-lg sm:rounded-xl bg-emerald-50 hover:bg-emerald-100/90 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-100 transition-colors cursor-pointer group ${isLandscapeCompact ? 'py-1' : 'py-2'}`}
           title="Klik untuk memilih langsung dari 114 surah tanpa scroll"
         >
           <div className="flex items-center gap-2 truncate">
-            <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+            <span className={`rounded-md sm:rounded-lg bg-emerald-600 text-white font-extrabold flex items-center justify-center shrink-0 shadow-xs ${isLandscapeCompact ? 'w-5 h-5 text-[10px]' : 'w-7 h-7 text-xs'}`}>
               {selectedSurah.number}
             </span>
             <div className="text-left truncate">
@@ -618,15 +652,17 @@ export const QuranView: React.FC<QuranViewProps> = ({
                   ({selectedSurah.englishNameTranslation})
                 </span>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                {selectedSurah.numberOfAyahs} Ayat • {selectedSurah.revelationType === 'Meccan' ? 'Makkiyyah' : 'Madaniyyah'}
-              </div>
+              {!isLandscapeCompact && (
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                  {selectedSurah.numberOfAyahs} Ayat • {selectedSurah.revelationType === 'Meccan' ? 'Makkiyyah' : 'Madaniyyah'}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-850 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-            <span>Ganti Surah</span>
-            <ChevronDown className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-850 px-2 py-0.5 rounded-md sm:rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            <span>Ganti</span>
+            <ChevronDown className="w-3 h-3" />
           </div>
         </button>
 
@@ -728,21 +764,23 @@ export const QuranView: React.FC<QuranViewProps> = ({
         </div>
 
         {/* Right Column: Verses Reading Area (8 cols) */}
-        <div className="lg:col-span-8 space-y-4">
+        <div className={isLandscapeCompact ? 'col-span-12 space-y-2' : 'lg:col-span-8 space-y-4'}>
           {/* Bismillah Header (except for Surah At-Taubah #9) */}
           {selectedSurah.number !== 9 && (
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 text-center shadow-xs">
+            <div className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center shadow-xs ${isLandscapeCompact ? 'rounded-xl p-2' : 'rounded-2xl p-6'}`}>
               <p
                 dir="rtl"
                 className={`${
                   quranFontStyle === 'amiri' ? 'font-quran-amiri' : 'font-quran-indonesia'
-                } text-3xl sm:text-4xl text-emerald-800 dark:text-emerald-300 leading-loose`}
+                } ${isLandscapeCompact ? 'text-xl sm:text-2xl leading-normal' : 'text-3xl sm:text-4xl leading-loose'} text-emerald-800 dark:text-emerald-300`}
               >
                 بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
               </p>
-              <p className="text-xs text-slate-500 italic mt-2">
-                Dengan nama Allah Yang Maha Pengasih lagi Maha Penyayang
-              </p>
+              {!isLandscapeCompact && (
+                <p className="text-xs text-slate-500 italic mt-2">
+                  Dengan nama Allah Yang Maha Pengasih lagi Maha Penyayang
+                </p>
+              )}
             </div>
           )}
 
@@ -768,7 +806,9 @@ export const QuranView: React.FC<QuranViewProps> = ({
                       scrollMarginTop: '90px',
                       scrollMarginBottom: '110px',
                     }}
-                    className={`scroll-margin-ayah bg-white dark:bg-slate-800 rounded-2xl p-6 border transition-all space-y-4 ${
+                    className={`scroll-margin-ayah bg-white dark:bg-slate-800 border transition-all ${
+                      isLandscapeCompact ? 'rounded-xl p-2.5 sm:p-3.5 space-y-2' : 'rounded-2xl p-6 space-y-4'
+                    } ${
                       isPlayingThis
                         ? 'border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/40 shadow-lg bg-gradient-to-b from-amber-50/25 via-emerald-50/15 to-transparent dark:from-amber-950/20 dark:via-emerald-950/10'
                         : isBookmarked
@@ -777,9 +817,9 @@ export const QuranView: React.FC<QuranViewProps> = ({
                     }`}
                   >
                     {/* Top action bar: Ayah number, Audio button, Bookmark button */}
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-750 pb-3">
+                    <div className={`flex items-center justify-between border-b border-slate-100 dark:border-slate-750 ${isLandscapeCompact ? 'pb-1.5' : 'pb-3'}`}>
                       <div className="flex items-center gap-2">
-                        <span className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center ${
+                        <span className={`rounded-lg font-bold flex items-center justify-center ${isLandscapeCompact ? 'w-6 h-6 text-[11px]' : 'w-7 h-7 text-xs'} ${
                           isPlayingThis
                             ? 'bg-amber-500 text-white shadow-xs'
                             : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
@@ -787,12 +827,12 @@ export const QuranView: React.FC<QuranViewProps> = ({
                           {selectedSurah.number}:{ayah.numberInSurah}
                         </span>
                         {isPlayingThis && (
-                          <span className="text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1.5 border border-amber-300 dark:border-amber-700">
+                          <span className="text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border border-amber-300 dark:border-amber-700">
                             <span className="flex h-1.5 w-1.5 relative">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
                             </span>
-                            <span>Highlight Audio Real-Time</span>
+                            <span>{isLandscapeCompact ? 'Highlight' : 'Highlight Audio Real-Time'}</span>
                           </span>
                         )}
                         {isBookmarked && !isPlayingThis && (
@@ -805,7 +845,7 @@ export const QuranView: React.FC<QuranViewProps> = ({
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handlePlayAyahAudio(ayah.numberInSurah, ayah.audioUrl)}
-                          className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 cursor-pointer transition-colors ${
+                          className={`rounded-lg border text-xs flex items-center gap-1 cursor-pointer transition-colors ${isLandscapeCompact ? 'p-1 px-2 text-[10px]' : 'p-1.5'} ${
                             isPlayingThis
                               ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                               : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
@@ -818,7 +858,7 @@ export const QuranView: React.FC<QuranViewProps> = ({
 
                         <button
                           onClick={() => saveLastRead(ayah.numberInSurah)}
-                          className={`p-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
+                          className={`rounded-lg border text-xs cursor-pointer transition-colors ${isLandscapeCompact ? 'p-1' : 'p-1.5'} ${
                             isBookmarked
                               ? 'bg-amber-500 text-white border-amber-500'
                               : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
@@ -832,88 +872,110 @@ export const QuranView: React.FC<QuranViewProps> = ({
 
                     {/* Active Playback Timeline Bar when playing */}
                     {isPlayingThis && (
-                      <div className="bg-amber-50/80 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/80 space-y-2">
-                        <div className="flex items-center justify-between text-[11px] text-amber-900 dark:text-amber-200 font-medium">
-                          <span className="flex items-center gap-1 text-[10px]">
+                      isLandscapeCompact ? (
+                        /* Ultra-compact 1-line progress indicator in landscape mode so Arabic text is 100% visible */
+                        <div className="bg-amber-50/90 dark:bg-amber-950/50 px-2 py-1 rounded-lg border border-amber-300 dark:border-amber-800/80 flex items-center justify-between gap-2 text-xs">
+                          <span className="text-[10px] text-amber-900 dark:text-amber-200 font-semibold flex items-center gap-1 shrink-0">
                             <Sparkles className="w-3 h-3 text-amber-600" />
-                            <span>Teks Arab menyorot kata yang sedang dilafalkan. Ketuk kata untuk melompat.</span>
+                            <span>Sorotan Kata</span>
                           </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setShowSyncTuner(!showSyncTuner)}
-                              className={`px-2 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
-                                showSyncTuner
-                                  ? 'bg-amber-600 text-white border-amber-600'
-                                  : 'bg-white/80 dark:bg-slate-900 text-amber-850 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-100'
-                              }`}
-                              title="Buka panel kalibrasi sinkronisasi audio dan teks"
-                            >
-                              <SlidersHorizontal className="w-2.5 h-2.5" />
-                              <span>Sync {syncOffsetMs !== 0 ? `${syncOffsetMs > 0 ? '+' : ''}${syncOffsetMs}ms` : '0ms'}</span>
-                            </button>
-                            <span className="font-mono text-xs font-bold shrink-0">
+                          <div className="flex items-center gap-2 flex-1 max-w-xs justify-end">
+                            <span className="font-mono text-[10px] font-bold text-amber-950 dark:text-amber-100 shrink-0">
                               {formatTime(audioProgress.currentTime)} / {formatTime(audioProgress.duration)}
                             </span>
+                            <div className="w-20 sm:w-28 bg-amber-200 dark:bg-amber-900 h-1.5 rounded-full overflow-hidden shrink-0">
+                              <div
+                                className="bg-amber-500 h-full transition-all duration-150 rounded-full"
+                                style={{ width: `${audioProgress.progressPercent}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
-
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="0.5"
-                          value={audioProgress.progressPercent}
-                          onChange={(e) => handleSeekAyah(parseFloat(e.target.value))}
-                          className="w-full h-1.5 bg-amber-200 dark:bg-amber-900 rounded-lg appearance-none cursor-pointer accent-amber-600"
-                          title="Geser timeline ayat"
-                        />
-
-                        {/* Interactive Audio Sync Calibrator */}
-                        {showSyncTuner && (
-                          <div className="pt-2 border-t border-amber-200/70 dark:border-amber-800/60 text-xs space-y-2 animate-in fade-in duration-150">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-amber-900 dark:text-amber-200 font-semibold">
-                                Penyetelan Waktu Highlight Teks (Sync Offset):
-                              </span>
-                              <span className="font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700">
-                                {syncOffsetMs === 0 ? '0 ms (Standar Presisi)' : syncOffsetMs > 0 ? `+${syncOffsetMs} ms (Lebih Lambat)` : `${syncOffsetMs} ms (Lebih Cepat)`}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Pilihan Cepat:</span>
-                              {[-200, -100, 0, 100, 200].map((preset) => (
-                                <button
-                                  key={preset}
-                                  onClick={() => handleUpdateSyncOffset(preset)}
-                                  className={`px-2 py-0.5 rounded text-[10px] font-medium border cursor-pointer transition-colors ${
-                                    syncOffsetMs === preset
-                                      ? 'bg-amber-600 text-white border-amber-600 shadow-2xs font-bold'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  {preset === 0 ? 'Normal (0ms)' : preset < 0 ? `${preset}ms (Maju Cepat)` : `+${preset}ms (Tahan Lambat)`}
-                                </button>
-                              ))}
-                            </div>
+                      ) : (
+                        /* Standard timeline box for portrait & large screens */
+                        <div className="bg-amber-50/80 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/80 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] text-amber-900 dark:text-amber-200 font-medium">
+                            <span className="flex items-center gap-1 text-[10px]">
+                              <Sparkles className="w-3 h-3 text-amber-600" />
+                              <span>Teks Arab menyorot kata yang sedang dilafalkan. Ketuk kata untuk melompat.</span>
+                            </span>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-500 font-mono shrink-0">-500ms</span>
-                              <input
-                                type="range"
-                                min="-500"
-                                max="500"
-                                step="25"
-                                value={syncOffsetMs}
-                                onChange={(e) => handleUpdateSyncOffset(parseInt(e.target.value, 10))}
-                                className="w-full h-1.5 bg-amber-200 dark:bg-amber-800 rounded-lg appearance-none cursor-pointer accent-amber-600"
-                              />
-                              <span className="text-[10px] text-slate-500 font-mono shrink-0">+500ms</span>
+                              <button
+                                onClick={() => setShowSyncTuner(!showSyncTuner)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
+                                  showSyncTuner
+                                    ? 'bg-amber-600 text-white border-amber-600'
+                                    : 'bg-white/80 dark:bg-slate-900 text-amber-850 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-100'
+                                }`}
+                                title="Buka panel kalibrasi sinkronisasi audio dan teks"
+                              >
+                                <SlidersHorizontal className="w-2.5 h-2.5" />
+                                <span>Sync {syncOffsetMs !== 0 ? `${syncOffsetMs > 0 ? '+' : ''}${syncOffsetMs}ms` : '0ms'}</span>
+                              </button>
+                              <span className="font-mono text-xs font-bold shrink-0">
+                                {formatTime(audioProgress.currentTime)} / {formatTime(audioProgress.duration)}
+                              </span>
                             </div>
-                            <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed italic">
-                              💡 <strong>Highlight terlalu lambat (tertinggal)?</strong> Geser ke minus (-). <strong>Highlight terlalu cepat (mendahului)?</strong> Geser ke plus (+). Pengaturan tersimpan otomatis.
-                            </p>
                           </div>
-                        )}
-                      </div>
+
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={audioProgress.progressPercent}
+                            onChange={(e) => handleSeekAyah(parseFloat(e.target.value))}
+                            className="w-full h-1.5 bg-amber-200 dark:bg-amber-900 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                            title="Geser timeline ayat"
+                          />
+
+                          {/* Interactive Audio Sync Calibrator */}
+                          {showSyncTuner && (
+                            <div className="pt-2 border-t border-amber-200/70 dark:border-amber-800/60 text-xs space-y-2 animate-in fade-in duration-150">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-amber-900 dark:text-amber-200 font-semibold">
+                                  Penyetelan Waktu Highlight Teks (Sync Offset):
+                                </span>
+                                <span className="font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700">
+                                  {syncOffsetMs === 0 ? '0 ms (Standar Presisi)' : syncOffsetMs > 0 ? `+${syncOffsetMs} ms (Lebih Lambat)` : `${syncOffsetMs} ms (Lebih Cepat)`}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Pilihan Cepat:</span>
+                                {[-200, -100, 0, 100, 200].map((preset) => (
+                                  <button
+                                    key={preset}
+                                    onClick={() => handleUpdateSyncOffset(preset)}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-medium border cursor-pointer transition-colors ${
+                                      syncOffsetMs === preset
+                                        ? 'bg-amber-600 text-white border-amber-600 shadow-2xs font-bold'
+                                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    {preset === 0 ? 'Normal (0ms)' : preset < 0 ? `${preset}ms (Maju Cepat)` : `+${preset}ms (Tahan Lambat)`}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-500 font-mono shrink-0">-500ms</span>
+                                <input
+                                  type="range"
+                                  min="-500"
+                                  max="500"
+                                  step="25"
+                                  value={syncOffsetMs}
+                                  onChange={(e) => handleUpdateSyncOffset(parseInt(e.target.value, 10))}
+                                  className="w-full h-1.5 bg-amber-200 dark:bg-amber-800 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                                />
+                                <span className="text-[10px] text-slate-500 font-mono shrink-0">+500ms</span>
+                              </div>
+                              <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed italic">
+                                💡 <strong>Highlight terlalu lambat (tertinggal)?</strong> Geser ke minus (-). <strong>Highlight terlalu cepat (mendahului)?</strong> Geser ke plus (+). Pengaturan tersimpan otomatis.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )
                     )}
 
                     {/* Arabic Text with Synchronized Real-Time Word Highlighting & Tajwid */}
@@ -964,7 +1026,11 @@ export const QuranView: React.FC<QuranViewProps> = ({
       {isPlayingAudio && currentPlayingAyah && (
         <aside
           aria-label="Panel Audio & Highlight Aktif"
-          className="fixed bottom-14 sm:bottom-4 left-3 right-3 max-w-2xl mx-auto z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-amber-300 dark:border-amber-700/80 rounded-2xl shadow-xl px-3 py-2 sm:py-2.5 flex items-center justify-between gap-2 transition-all animate-in slide-in-from-bottom-2 duration-200"
+          className={`fixed left-2 right-2 max-w-xl mx-auto z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-amber-300 dark:border-amber-700/80 rounded-2xl shadow-xl transition-all animate-in slide-in-from-bottom-2 duration-200 ${
+            isLandscapeCompact
+              ? 'bottom-1 py-1 px-2.5 flex items-center justify-between gap-1.5 text-xs'
+              : 'bottom-14 sm:bottom-4 px-3 py-2 sm:py-2.5 flex items-center justify-between gap-2'
+          }`}
         >
           {/* Left: Ayah info & center/scroll button */}
           <button

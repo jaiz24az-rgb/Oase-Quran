@@ -37,4 +37,9 @@
   .font-quran-amiri {
     line-height: 1.95 !important;
   }
+
+  .scroll-margin-ayah {
+    scroll-margin-top: 40px !important;
+    scroll-margin-bottom: 50px !important;
+  }
 }
