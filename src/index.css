@@ -20,4 +20,21 @@
     font-family: 'Lateef', 'Scheherazade New', serif;
     line-height: 2.2;
   }
+
+  .scroll-margin-ayah {
+    scroll-margin-top: 90px;
+    scroll-margin-bottom: 110px;
+  }
+}
+
+/* Landscape orientation optimization: ensures comfortable reading on smartphones and tablets */
+@media (orientation: landscape) and (max-height: 560px) {
+  .font-quran,
+  .font-quran-indonesia {
+    line-height: 2.05 !important;
+  }
+
+  .font-quran-amiri {
+    line-height: 1.95 !important;
+  }
 }

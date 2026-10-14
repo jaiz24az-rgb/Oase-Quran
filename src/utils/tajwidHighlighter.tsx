@@ -69,10 +69,19 @@ export const TAJWID_RULES: TajwidRuleGuide[] = [
 
 /**
  * Parses and highlights Arabic text with Tajwid color codes for Indonesian Mushaf readers.
+ * When isActiveWord is true, uses deep high-contrast text and underline accents so words remain 100% legible against luminous highlight backgrounds.
  */
-export function renderTajwidText(text: string, enableTajwid: boolean = true): React.ReactNode {
+export function renderTajwidText(
+  text: string,
+  enableTajwid: boolean = true,
+  isActiveWord: boolean = false
+): React.ReactNode {
   if (!enableTajwid) {
-    return <span>{text}</span>;
+    return (
+      <span className={isActiveWord ? 'font-extrabold text-slate-950 dark:text-slate-950' : undefined}>
+        {text}
+      </span>
+    );
   }
 
   // Regex patterns for Islamic tajwid rules
@@ -83,7 +92,6 @@ export function renderTajwidText(text: string, enableTajwid: boolean = true): Re
   const parts: React.ReactNode[] = [];
   let currentIndex = 0;
 
-  // Pattern matcher scanning through the text
   const tajwidRegex = /([\u0642\u0637\u0628\u062c\u062f]\u0652)|([\u0646\u0645]\u0651)|([^\s]{0,2}\u0653)|([\u06E2ۢ])/g;
   let match: RegExpExecArray | null;
 
@@ -93,7 +101,16 @@ export function renderTajwidText(text: string, enableTajwid: boolean = true): Re
 
     // Normal text before match
     if (matchStart > currentIndex) {
-      parts.push(text.slice(currentIndex, matchStart));
+      const slice = text.slice(currentIndex, matchStart);
+      parts.push(
+        isActiveWord ? (
+          <span key={`plain-${currentIndex}`} className="text-slate-950 dark:text-slate-950 font-extrabold">
+            {slice}
+          </span>
+        ) : (
+          slice
+        )
+      );
     }
 
     const matchedStr = match[0];
@@ -103,7 +120,11 @@ export function renderTajwidText(text: string, enableTajwid: boolean = true): Re
       parts.push(
         <span
           key={`q-${matchStart}`}
-          className="text-rose-600 dark:text-rose-400 font-bold px-0.5 rounded transition-colors"
+          className={
+            isActiveWord
+              ? 'text-rose-950 dark:text-rose-950 font-extrabold underline decoration-rose-700 decoration-2 underline-offset-4 px-0.5'
+              : 'text-rose-600 dark:text-rose-400 font-bold px-0.5 rounded transition-colors'
+          }
           title="Qalqalah (pantulan)"
         >
           {matchedStr}
@@ -114,7 +135,11 @@ export function renderTajwidText(text: string, enableTajwid: boolean = true): Re
       parts.push(
         <span
           key={`g-${matchStart}`}
-          className="text-emerald-600 dark:text-emerald-400 font-bold px-0.5 rounded transition-colors"
+          className={
+            isActiveWord
+              ? 'text-emerald-950 dark:text-emerald-950 font-extrabold underline decoration-emerald-800 decoration-2 underline-offset-4 px-0.5'
+              : 'text-emerald-600 dark:text-emerald-400 font-bold px-0.5 rounded transition-colors'
+          }
           title="Ghunnah (dengung 2 harakat)"
         >
           {matchedStr}
@@ -125,7 +150,11 @@ export function renderTajwidText(text: string, enableTajwid: boolean = true): Re
       parts.push(
         <span
           key={`m-${matchStart}`}
-          className="text-purple-600 dark:text-purple-400 font-bold px-0.5 rounded transition-colors"
+          className={
+            isActiveWord
+              ? 'text-purple-950 dark:text-purple-950 font-extrabold underline decoration-purple-800 decoration-2 underline-offset-4 px-0.5'
+              : 'text-purple-600 dark:text-purple-400 font-bold px-0.5 rounded transition-colors'
+          }
           title="Mad Wajib / Jaiz (panjang 4-6 harakat)"
         >
           {matchedStr}
@@ -136,7 +165,11 @@ export function renderTajwidText(text: string, enableTajwid: boolean = true): Re
       parts.push(
         <span
           key={`i-${matchStart}`}
-          className="text-teal-600 dark:text-teal-400 font-bold px-0.5 rounded transition-colors"
+          className={
+            isActiveWord
+              ? 'text-teal-950 dark:text-teal-950 font-extrabold underline decoration-teal-800 decoration-2 underline-offset-4 px-0.5'
+              : 'text-teal-600 dark:text-teal-400 font-bold px-0.5 rounded transition-colors'
+          }
           title="Iqlab (menjadi bunyi Mim)"
         >
           {matchedStr}
@@ -151,7 +184,16 @@ export function renderTajwidText(text: string, enableTajwid: boolean = true): Re
 
   // Push remaining text
   if (currentIndex < text.length) {
-    parts.push(text.slice(currentIndex));
+    const slice = text.slice(currentIndex);
+    parts.push(
+      isActiveWord ? (
+        <span key={`plain-${currentIndex}`} className="text-slate-950 dark:text-slate-950 font-extrabold">
+          {slice}
+        </span>
+      ) : (
+        slice
+      )
+    );
   }
 
   return <>{parts}</>;

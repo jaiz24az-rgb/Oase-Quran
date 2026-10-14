@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { renderTajwidText } from '../utils/tajwidHighlighter';
 import { WordTimingSegment } from '../utils/quranTimingService';
 
@@ -17,6 +17,7 @@ export interface SynchronizedArabicTextProps {
   showAyahEndMarker?: number;
   className?: string;
   allowWordSeek?: boolean;
+  autoFollowWord?: boolean; // Ensure active word is always centered and readable on screen
 }
 
 interface TextToken {
@@ -104,6 +105,7 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
   showAyahEndMarker,
   className = '',
   allowWordSeek = true,
+  autoFollowWord = true,
 }) => {
   // Retrieve saved sync offset if not explicitly provided
   const activeOffsetMs = useMemo(() => {
@@ -265,6 +267,42 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
     return 0;
   }, [isPlaying, spokenWordsCount, wordTimings, currentTime, duration, progressPercent, activeOffsetMs, tokens]);
 
+  // Reference to the currently active word element for real-time viewport tracking
+  const activeWordElRef = useRef<HTMLSpanElement | null>(null);
+
+  // Automatically keep the active word centered and visible in the viewport
+  // Works seamlessly in both portrait and compact landscape modes
+  useEffect(() => {
+    if (!autoFollowWord || !isPlaying || activeWordIndex < 0 || !activeWordElRef.current) {
+      return;
+    }
+
+    const el = activeWordElRef.current;
+    const rafId = requestAnimationFrame(() => {
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+
+      // In landscape orientation (or small screens), vertical height is typically 320px - 520px.
+      // In portrait orientation, height is 600px - 900px.
+      // Clearance guarantees text is never occluded by sticky header (top) or bottom bars (bottom).
+      const isCompactLandscape = vh <= 540;
+      const safeTop = isCompactLandscape ? 55 : 85;
+      const safeBottom = isCompactLandscape ? vh - 60 : vh - 110;
+
+      // If active word is nearing edge or off-screen, smoothly scroll it into comfortable reading center
+      if (rect.top < safeTop || rect.bottom > safeBottom) {
+        el.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest',
+        });
+      }
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [activeWordIndex, isPlaying, autoFollowWord]);
+
   const fontClass = fontStyle === 'amiri' ? 'font-quran-amiri' : 'font-quran-indonesia';
 
   return (
@@ -291,23 +329,24 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
 
         // Custom highlight classes
         let wordClasses =
-          'inline-block mx-0.5 px-1 py-0.5 rounded-xl transition-all duration-150 ';
+          'inline-block transition-all duration-150 ';
 
         if (isWordActive) {
-          // Dynamic karaoke highlight: warm amber/golden glow with soft ring and gentle pulse
+          // Luminous golden-amber karaoke highlight: maximum contrast against both light and dark backgrounds
+          // Guaranteed readable in bright light, dark mode, landscape and portrait
           wordClasses +=
-            'bg-amber-300 dark:bg-amber-400/35 text-amber-950 dark:text-amber-100 ring-2 ring-amber-400 dark:ring-amber-300 shadow-sm scale-105 font-bold z-10';
+            'relative bg-amber-400 text-slate-950 dark:bg-amber-400 dark:text-slate-950 font-extrabold ring-2 ring-amber-500 dark:ring-amber-300 shadow-md shadow-amber-500/35 scale-[1.04] z-20 rounded-xl px-2 py-0.5 mx-0.5 ';
         } else if (isWordPast) {
-          // Already read word: subtle emerald tint
+          // Already recited word: calm emerald tint
           wordClasses +=
-            'text-emerald-850 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20';
+            'text-emerald-900 dark:text-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-lg px-1 py-0.5 mx-0.5 ';
         } else if (isWordFuture) {
-          // Upcoming word: slightly dimmed for reading focus
-          wordClasses += 'text-slate-800 dark:text-slate-200 opacity-75';
+          // Upcoming word: crisp and high-contrast for smooth sight-reading ahead
+          wordClasses += 'text-slate-800 dark:text-slate-200 opacity-90 px-1 py-0.5 mx-0.5 ';
         } else {
           // Normal state (audio paused or not playing)
           wordClasses +=
-            'text-slate-900 dark:text-slate-50 hover:bg-slate-100 dark:hover:bg-slate-700/50';
+            'text-slate-900 dark:text-slate-50 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg px-1 py-0.5 mx-0.5 ';
         }
 
         if (allowWordSeek && onWordClick) {
@@ -317,6 +356,13 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
         return (
           <span
             key={`word-${token.wordIndex}-${token.cleanWord}-${idx}`}
+            ref={isWordActive ? activeWordElRef : undefined}
+            id={isWordActive ? 'active-quran-reading-word' : undefined}
+            data-active-word={isWordActive ? 'true' : undefined}
+            style={{
+              scrollMarginTop: '90px',
+              scrollMarginBottom: '110px',
+            }}
             onClick={(e) => {
               if (allowWordSeek && onWordClick) {
                 e.stopPropagation();
@@ -332,7 +378,14 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
                 : undefined
             }
           >
-            {renderTajwidText(token.raw, enableTajwid)}
+            {renderTajwidText(token.raw, enableTajwid, isWordActive)}
+            {/* Visual reading beacon indicator under active word */}
+            {isWordActive && (
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-amber-600 dark:bg-amber-800 rounded-full animate-pulse pointer-events-none"
+              />
+            )}
           </span>
         );
       })}

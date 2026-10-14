@@ -325,9 +325,9 @@ export const QuranView: React.FC<QuranViewProps> = ({
   });
 
   const getFontSizeClass = () => {
-    if (arabicFontSize === 'normal') return 'text-2xl sm:text-3xl leading-loose';
-    if (arabicFontSize === 'xlarge') return 'text-4xl sm:text-5xl leading-loose';
-    return 'text-3xl sm:text-4xl leading-loose'; // large
+    if (arabicFontSize === 'normal') return 'text-xl sm:text-2xl lg:text-3xl leading-loose landscape:leading-relaxed';
+    if (arabicFontSize === 'xlarge') return 'text-3xl sm:text-4xl lg:text-5xl leading-loose landscape:leading-relaxed';
+    return 'text-2xl sm:text-3xl lg:text-4xl leading-loose landscape:leading-relaxed'; // large
   };
 
   return (
@@ -764,7 +764,11 @@ export const QuranView: React.FC<QuranViewProps> = ({
                   <div
                     key={ayah.numberInSurah}
                     id={`ayah-${ayah.numberInSurah}`}
-                    className={`bg-white dark:bg-slate-800 rounded-2xl p-6 border transition-all space-y-4 ${
+                    style={{
+                      scrollMarginTop: '90px',
+                      scrollMarginBottom: '110px',
+                    }}
+                    className={`scroll-margin-ayah bg-white dark:bg-slate-800 rounded-2xl p-6 border transition-all space-y-4 ${
                       isPlayingThis
                         ? 'border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/40 shadow-lg bg-gradient-to-b from-amber-50/25 via-emerald-50/15 to-transparent dark:from-amber-950/20 dark:via-emerald-950/10'
                         : isBookmarked
@@ -926,6 +930,7 @@ export const QuranView: React.FC<QuranViewProps> = ({
                         fontStyle={quranFontStyle}
                         fontSizeClass={getFontSizeClass()}
                         showAyahEndMarker={ayah.numberInSurah}
+                        autoFollowWord={autoFollowAyah}
                         onWordClick={isPlayingThis ? (_idx, pct, sec) => handleSeekAyah(pct, sec) : undefined}
                       />
                     </div>
@@ -953,6 +958,112 @@ export const QuranView: React.FC<QuranViewProps> = ({
         </div>
       </div>
         </>
+      )}
+
+      {/* Sticky Audio Listening Bar: Keeps highlight visible & provides immediate navigation in Portrait & Landscape */}
+      {isPlayingAudio && currentPlayingAyah && (
+        <aside
+          aria-label="Panel Audio & Highlight Aktif"
+          className="fixed bottom-14 sm:bottom-4 left-3 right-3 max-w-2xl mx-auto z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-amber-300 dark:border-amber-700/80 rounded-2xl shadow-xl px-3 py-2 sm:py-2.5 flex items-center justify-between gap-2 transition-all animate-in slide-in-from-bottom-2 duration-200"
+        >
+          {/* Left: Ayah info & center/scroll button */}
+          <button
+            onClick={() => {
+              const el =
+                document.getElementById('active-quran-reading-word') ||
+                document.getElementById(`ayah-${currentPlayingAyah}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }}
+            className="flex items-center gap-2 text-left cursor-pointer group shrink-0"
+            title="Klik untuk langsung mengarahkan layar ke kata atau ayat yang sedang dilafalkan"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+              {selectedSurah.number}:{currentPlayingAyah}
+            </div>
+            <div className="hidden xs:block truncate max-w-[120px] sm:max-w-[200px]">
+              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                QS. {selectedSurah.englishName} : {currentPlayingAyah}
+              </p>
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block"></span>
+                <span>Sorotan Berjalan (Klik Fokus)</span>
+              </p>
+            </div>
+          </button>
+
+          {/* Center: Recitation Controls (Prev Ayah, Play/Pause, Next Ayah, Stop) */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <button
+              onClick={() => {
+                if (currentPlayingAyah > 1) {
+                  handlePlayAyahAudio(currentPlayingAyah - 1);
+                }
+              }}
+              disabled={currentPlayingAyah <= 1}
+              className="p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
+              title="Ayat Sebelumnya"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => handlePlayAyahAudio(currentPlayingAyah)}
+              className="p-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-all active:scale-95"
+              title={isPlayingAudio ? 'Jeda Audio' : 'Lanjutkan Audio'}
+            >
+              {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </button>
+
+            <button
+              onClick={() => {
+                if (currentPlayingAyah < verses.length) {
+                  handlePlayAyahAudio(currentPlayingAyah + 1);
+                }
+              }}
+              disabled={currentPlayingAyah >= verses.length}
+              className="p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
+              title="Ayat Berikutnya"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={stopAudio}
+              className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+              title="Hentikan Audio"
+            >
+              <Square className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Right: Auto-follow toggle & Sync Offset calibrator */}
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <button
+              onClick={() => setAutoFollowAyah(!autoFollowAyah)}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 cursor-pointer transition-colors ${
+                autoFollowAyah
+                  ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+              }`}
+              title={autoFollowAyah ? 'Auto-scroll aktif: Layar otomatis mengikuti kata yang dibaca' : 'Auto-scroll nonaktif'}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${autoFollowAyah ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
+              <span className="hidden sm:inline">Ikuti:</span>
+              <span>{autoFollowAyah ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <button
+              onClick={() => setShowSyncTuner(!showSyncTuner)}
+              className="px-2 py-1 rounded-lg text-[10px] font-semibold border bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-1"
+              title="Buka panel kalibrasi sinkronisasi audio (- / + ms)"
+            >
+              <SlidersHorizontal className="w-2.5 h-2.5" />
+              <span className="font-mono">{syncOffsetMs !== 0 ? `${syncOffsetMs > 0 ? '+' : ''}${syncOffsetMs}ms` : '0ms'}</span>
+            </button>
+          </div>
+        </aside>
       )}
 
       {/* Modal for selecting Surah directly without having to scroll down */}
