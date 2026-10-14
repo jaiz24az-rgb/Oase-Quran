@@ -502,8 +502,8 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
               {/* Fiqih Footnotes */}
               <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[10px] text-slate-600 dark:text-slate-400 space-y-1">
                 <p className="font-bold text-emerald-800 dark:text-emerald-400">Catatan Fiqih Hisab:</p>
-                <p>• Awal Waktu Subuh dihitung pada posisi matahari -18° (Standar hisab fajar shadiq kontemporer).</p>
-                <p>• Imsak adalah waktu peringatan (tanbih) 10 menit sebelum Subuh. Waktu Maghrib menandakan terbenamnya piringan matahari.</p>
+                <p>• Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, jadwal ini disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah, yang mendukung penyatuan waktu ibadah umat Islam secara global.</p>
+                <p>• Awal Waktu Subuh dihitung pada posisi matahari -18° di bawah ufuk. Imsak adalah peringatan (tanbih) 10 menit sebelum Subuh.</p>
               </div>
             </div>
           </div>

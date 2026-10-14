@@ -300,7 +300,7 @@ export function generateTarjihSchedulePdf(options: PdfExportOptions): jsPDF {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
   doc.text(
-    '1. (*) Awal Waktu Subuh dihitung pada ketinggian matahari -18° di bawah ufuk timur sesuai hisab ilmiah kontemporer.',
+    '1. Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah.',
     margin + 3,
     footerBoxY + 7
   );

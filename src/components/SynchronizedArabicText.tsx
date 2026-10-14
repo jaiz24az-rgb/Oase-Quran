@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { renderTajwidText } from '../utils/tajwidHighlighter';
+import { WordTimingSegment } from '../utils/quranTimingService';
 
 export interface SynchronizedArabicTextProps {
   text: string;
@@ -7,11 +8,12 @@ export interface SynchronizedArabicTextProps {
   progressPercent?: number; // 0 to 100
   currentTime?: number; // Exact audio playback time in seconds
   duration?: number; // Exact audio duration in seconds
-  syncOffsetMs?: number; // User calibration offset in ms (-300 to +300ms)
+  syncOffsetMs?: number; // User calibration offset in ms (-500 to +500ms)
+  wordTimings?: WordTimingSegment[] | null; // Exact millisecond segments from audio recitation
   enableTajwid?: boolean;
   fontStyle?: 'indonesia' | 'amiri';
   fontSizeClass?: string;
-  onWordClick?: (wordIndex: number, targetPercent: number) => void;
+  onWordClick?: (wordIndex: number, targetPercent: number, targetTimeSec?: number) => void;
   showAyahEndMarker?: number;
   className?: string;
   allowWordSeek?: boolean;
@@ -25,29 +27,31 @@ interface TextToken {
   weight: number;
   startPct: number;
   endPct: number;
+  startSec?: number;
+  endSec?: number;
 }
 
 /**
  * Phonetic length calculator based on Tajwid & Tartil rules:
- * - Mad Thabi'i: 2 beats (dagger alif, waw/ya saghirah, fathah+alif, dhammah+waw, kasrah+ya)
- * - Mad Far'i (Maddah sign ~): 4 to 5 beats
- * - Ghunnah Musyaddadah on Nun (نّ) and Mim (مّ): 2 beats with nasal resonance
+ * - Natural base duration per word (prevents short connectors from rushing too fast)
+ * - Mad Thabi'i: ~2 beats (dagger alif, waw/ya saghirah, fathah+alif, dhammah+waw, kasrah+ya)
+ * - Mad Far'i (Maddah sign ~): ~4 beats
+ * - Ghunnah Musyaddadah on Nun (نّ) and Mim (مّ): ~2 beats
  * - Qolqolah sukun: distinct articulation bounce
- * - Short particles (e.g. "وَ", "فَ"): adjusted lighter weight
- * - Final Word Waqaf (Mad 'Aridh Lissukun): reciters hold the stopping word 1.8x longer
+ * - Waqaf on the final word: gentle natural holding (~1.18x instead of excessive 1.85x)
  */
 function computePhoneticWeight(word: string, isLastWord: boolean): number {
   const clean = word.replace(/[^\u0600-\u06FF]/g, '');
-  if (!clean) return 1.5;
+  if (!clean) return 3.5;
 
-  // Basic Arabic letters
+  // Basic Arabic letters (consonants / long vowels)
   const baseLetters = (clean.match(/[\u0621-\u064A\u0671-\u06D3]/g) || []).length;
   // Harakat (fathah, kasrah, dhammah, sukun)
   const basicHarakat = (clean.match(/[\u064E\u064F\u0650\u0652]/g) || []).length;
   // Tanwin (fathatain, kasratain, dammatain)
   const tanwin = (clean.match(/[\u064B\u064C\u064D]/g) || []).length;
 
-  // Ghunnah Musyaddadah: Shaddah on Nun or Mim (held 2 full beats)
+  // Ghunnah Musyaddadah: Shaddah on Nun or Mim (held 2 beats)
   const ghunnahShaddah = (clean.match(/[نم]\u0651/g) || []).length;
   // Other shaddah doubling
   const regularShaddah = Math.max(0, (clean.match(/\u0651/g) || []).length - ghunnahShaddah);
@@ -64,27 +68,22 @@ function computePhoneticWeight(word: string, isLastWord: boolean): number {
   // Qolqolah letters with sukun
   const qolqolah = (clean.match(/[قطبجد]\u0652/g) || []).length;
 
+  // Balanced base articulation: ensures even single-letter words have sufficient time
   let weight =
-    baseLetters * 1.8 +
-    basicHarakat * 0.4 +
-    tanwin * 1.5 +
-    ghunnahShaddah * 3.5 +
-    regularShaddah * 1.8 +
-    daggerAlif * 2.2 +
-    regularMadLetters * 2.0 +
-    maddah * 5.0 +
-    qolqolah * 1.1;
+    3.8 +
+    baseLetters * 1.2 +
+    basicHarakat * 0.3 +
+    tanwin * 1.2 +
+    ghunnahShaddah * 2.2 +
+    regularShaddah * 1.2 +
+    daggerAlif * 1.8 +
+    regularMadLetters * 1.6 +
+    maddah * 2.8 +
+    qolqolah * 0.8;
 
-  // Adjust short connector words (like "وَ", "فَ", "فِي", "مِنْ")
-  if (baseLetters <= 2 && !ghunnahShaddah && !maddah) {
-    weight = Math.max(1.8, weight * 0.9);
-  } else {
-    weight = Math.max(2.6, weight);
-  }
-
-  // Last word waqaf / stopping elongation (Mad 'Aridh Lissukun in Tartil recitation)
+  // Natural waqaf hold on the stopping word
   if (isLastWord) {
-    weight *= 1.85;
+    weight *= 1.18;
   }
 
   return weight;
@@ -97,6 +96,7 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
   currentTime,
   duration,
   syncOffsetMs,
+  wordTimings,
   enableTajwid = true,
   fontStyle = 'indonesia',
   fontSizeClass = 'text-2xl sm:text-3xl lg:text-4xl',
@@ -163,33 +163,71 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
       accumulatedWeight += w;
       const endPct = (accumulatedWeight / totalWeight) * 100;
 
+      // Match exact timing segment if available
+      const timing = wordTimings?.find((t) => t.wordIndex === item.wordIndex);
+
       return {
         ...item,
         weight: w,
         startPct,
         endPct,
+        startSec: timing?.startSec,
+        endSec: timing?.endSec,
       };
     });
 
     return { tokens: finalTokens, spokenWordsCount: totalSpoken };
-  }, [text]);
+  }, [text, wordTimings]);
 
-  // Audio Speech Window Normalization:
-  // Trims leading silence/breath (~150-350ms) and trailing room reverb (~600-1200ms)
-  // so the highlight matches active speech precisely without lagging at the end or starting too early.
+  // Real-Time Word Highlighting:
+  // 1. Ground truth: Exact word-by-word timestamps from Quran recitation segments if available.
+  // 2. High-precision fallback: Balanced phonetic articulation weighting with natural speech bounds.
   const activeWordIndex = useMemo(() => {
     if (!isPlaying || spokenWordsCount === 0) return -1;
 
+    // 1. Exact Word Timings from audio segments
+    if (wordTimings && wordTimings.length > 0 && currentTime !== undefined) {
+      const adjustedTime = Math.max(0, currentTime + (activeOffsetMs / 1000));
+
+      const matchingSegment = wordTimings.find(
+        (t) => adjustedTime >= t.startSec && adjustedTime < t.endSec
+      );
+
+      if (matchingSegment) {
+        return matchingSegment.wordIndex;
+      }
+
+      // If playback is before the first word's start, highlight word 0
+      if (adjustedTime < wordTimings[0].startSec) {
+        return 0;
+      }
+
+      // If playback has passed the last word's start, highlight the last word
+      const last = wordTimings[wordTimings.length - 1];
+      if (adjustedTime >= last.startSec) {
+        return last.wordIndex;
+      }
+
+      // Interpolate between gap if any
+      const nextWord = wordTimings.find((t) => t.startSec > adjustedTime);
+      if (nextWord && nextWord.wordIndex > 0) {
+        return nextWord.wordIndex - 1;
+      }
+    }
+
+    // 2. High-precision phonetic timeline calculation
     let effectiveProgress: number;
 
     if (duration !== undefined && duration > 0 && currentTime !== undefined) {
-      // Millisecond-accurate timeline calculation
-      const leadSilenceSec = Math.min(0.35, Math.max(0.12, duration * 0.04));
-      const tailSilenceSec = Math.min(1.4, Math.max(0.55, duration * 0.13));
+      // Natural speech envelope for recitation audio:
+      // Lead silence is typically 40ms to 150ms
+      const leadSilenceSec = Math.min(0.15, Math.max(0.04, duration * 0.02));
+      // Tail decay is typically 100ms to 350ms
+      const tailSilenceSec = Math.min(0.35, Math.max(0.10, duration * 0.05));
       const activeSpeechDur = Math.max(0.2, duration - leadSilenceSec - tailSilenceSec);
 
-      // Apply vocal lead anticipation (80ms) + user offset
-      const adjustedTime = currentTime + (activeOffsetMs / 1000) + 0.08;
+      // Apply user calibration offset (clean time without artificial advance)
+      const adjustedTime = currentTime + (activeOffsetMs / 1000);
 
       if (adjustedTime <= leadSilenceSec) {
         effectiveProgress = 0;
@@ -200,12 +238,11 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
       }
     } else {
       // Fallback using progressPercent with normalized active speech curve
-      const offsetPercent = (activeOffsetMs / 3000) * 100; // proportional offset
-      const rawPct = Math.max(0, Math.min(100, (progressPercent || 0) + offsetPercent + 2.5));
+      const offsetPercent = (activeOffsetMs / 3000) * 100;
+      const rawPct = Math.max(0, Math.min(100, (progressPercent || 0) + offsetPercent));
 
-      // Standard EveryAyah & Hisnul Muslim clips: speech typically starts at ~3.5% and ends at ~88%
-      const startPct = 3.5;
-      const endPct = 88.0;
+      const startPct = 1.5;
+      const endPct = 96.0;
 
       if (rawPct <= startPct) {
         effectiveProgress = 0;
@@ -226,7 +263,7 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
     if (matchingToken) return matchingToken.wordIndex;
     if (clampedProgress >= 95) return spokenWordsCount - 1;
     return 0;
-  }, [isPlaying, tokens, spokenWordsCount, currentTime, duration, progressPercent, activeOffsetMs]);
+  }, [isPlaying, spokenWordsCount, wordTimings, currentTime, duration, progressPercent, activeOffsetMs, tokens]);
 
   const fontClass = fontStyle === 'amiri' ? 'font-quran-amiri' : 'font-quran-indonesia';
 
@@ -283,9 +320,9 @@ export const SynchronizedArabicText: React.FC<SynchronizedArabicTextProps> = ({
             onClick={(e) => {
               if (allowWordSeek && onWordClick) {
                 e.stopPropagation();
-                // Map word timing to seekable percentage
+                // Map word timing to seekable percentage and exact seconds
                 const targetPercent = Math.max(0, token.startPct);
-                onWordClick(token.wordIndex, targetPercent);
+                onWordClick(token.wordIndex, targetPercent, token.startSec);
               }
             }}
             className={wordClasses}

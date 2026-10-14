@@ -6,6 +6,7 @@ import { renderTajwidText, TAJWID_RULES } from '../utils/tajwidHighlighter';
 import { SynchronizedArabicText } from './SynchronizedArabicText';
 import { QuranMappingView } from './QuranMappingView';
 import { QuranMemorizeSHQView } from './QuranMemorizeSHQView';
+import { getSurahWordTimings, WordTimingSegment } from '../utils/quranTimingService';
 
 interface QuranViewProps {
   initialSurahNumber?: number;
@@ -29,6 +30,7 @@ export const QuranView: React.FC<QuranViewProps> = ({
   });
   const [verses, setVerses] = useState<QuranAyah[]>(LOCAL_SURAHS_MAP[1] || []);
   const [isLoadingVerses, setIsLoadingVerses] = useState<boolean>(false);
+  const [surahWordTimings, setSurahWordTimings] = useState<Record<number, WordTimingSegment[]>>({});
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterJuz30, setFilterJuz30] = useState<boolean>(false);
   const [showSurahModal, setShowSurahModal] = useState<boolean>(false);
@@ -141,16 +143,24 @@ export const QuranView: React.FC<QuranViewProps> = ({
     }
   });
 
-  // Load verses when selectedSurah changes
+  // Load verses and exact word-by-word timestamps when selectedSurah changes
   useEffect(() => {
     let isMounted = true;
     setIsLoadingVerses(true);
     stopAudio();
 
+    // Fetch verses data
     fetchSurahVerses(selectedSurah.number).then((data) => {
       if (isMounted) {
         setVerses(data);
         setIsLoadingVerses(false);
+      }
+    });
+
+    // Fetch millisecond-exact word segment timestamps for active surah
+    getSurahWordTimings(selectedSurah.number).then((timings) => {
+      if (isMounted) {
+        setSurahWordTimings(timings);
       }
     });
 
@@ -249,10 +259,14 @@ export const QuranView: React.FC<QuranViewProps> = ({
     };
   };
 
-  const handleSeekAyah = (targetPercent: number) => {
+  const handleSeekAyah = (targetPercent: number, targetTimeSec?: number) => {
     if (audioRef.current && !isNaN(audioRef.current.duration) && audioRef.current.duration > 0) {
-      const targetTime = (targetPercent / 100) * audioRef.current.duration;
-      audioRef.current.currentTime = targetTime;
+      if (targetTimeSec !== undefined && targetTimeSec >= 0) {
+        audioRef.current.currentTime = Math.min(audioRef.current.duration - 0.05, targetTimeSec);
+      } else {
+        const targetTime = (targetPercent / 100) * audioRef.current.duration;
+        audioRef.current.currentTime = targetTime;
+      }
     }
   };
 
@@ -852,46 +866,46 @@ export const QuranView: React.FC<QuranViewProps> = ({
 
                         {/* Interactive Audio Sync Calibrator */}
                         {showSyncTuner && (
-                          <div className="pt-1.5 border-t border-amber-200/70 dark:border-amber-800/60 text-xs space-y-1.5 animate-in fade-in duration-150">
+                          <div className="pt-2 border-t border-amber-200/70 dark:border-amber-800/60 text-xs space-y-2 animate-in fade-in duration-150">
                             <div className="flex items-center justify-between text-[11px]">
                               <span className="text-amber-900 dark:text-amber-200 font-semibold">
-                                Penyelarasan Waktu Highlight (Audio Offset):
+                                Penyetelan Waktu Highlight Teks (Sync Offset):
                               </span>
-                              <span className="font-mono font-bold text-amber-800 dark:text-amber-300">
-                                {syncOffsetMs > 0 ? `+${syncOffsetMs}` : syncOffsetMs} ms
+                              <span className="font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700">
+                                {syncOffsetMs === 0 ? '0 ms (Standar Presisi)' : syncOffsetMs > 0 ? `+${syncOffsetMs} ms (Lebih Lambat)` : `${syncOffsetMs} ms (Lebih Cepat)`}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400">Pilihan Cepat:</span>
-                              {[-100, -50, 0, 50, 100].map((preset) => (
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Pilihan Cepat:</span>
+                              {[-200, -100, 0, 100, 200].map((preset) => (
                                 <button
                                   key={preset}
                                   onClick={() => handleUpdateSyncOffset(preset)}
                                   className={`px-2 py-0.5 rounded text-[10px] font-medium border cursor-pointer transition-colors ${
                                     syncOffsetMs === preset
-                                      ? 'bg-amber-600 text-white border-amber-600'
+                                      ? 'bg-amber-600 text-white border-amber-600 shadow-2xs font-bold'
                                       : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
                                   }`}
                                 >
-                                  {preset === 0 ? 'Normal (0ms)' : preset < 0 ? `${preset}ms (Lebih Awal)` : `+${preset}ms (Lebih Lambat)`}
+                                  {preset === 0 ? 'Normal (0ms)' : preset < 0 ? `${preset}ms (Maju Cepat)` : `+${preset}ms (Tahan Lambat)`}
                                 </button>
                               ))}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-500 shrink-0">-300ms</span>
+                              <span className="text-[10px] text-slate-500 font-mono shrink-0">-500ms</span>
                               <input
                                 type="range"
-                                min="-300"
-                                max="300"
+                                min="-500"
+                                max="500"
                                 step="25"
                                 value={syncOffsetMs}
                                 onChange={(e) => handleUpdateSyncOffset(parseInt(e.target.value, 10))}
-                                className="w-full h-1 bg-amber-200 dark:bg-amber-800 rounded appearance-none cursor-pointer accent-amber-600"
+                                className="w-full h-1.5 bg-amber-200 dark:bg-amber-800 rounded-lg appearance-none cursor-pointer accent-amber-600"
                               />
-                              <span className="text-[10px] text-slate-500 shrink-0">+300ms</span>
+                              <span className="text-[10px] text-slate-500 font-mono shrink-0">+500ms</span>
                             </div>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
-                              💡 Nilai minus (-) memajukan highlight lebih awal (cocok untuk earphone Bluetooth), nilai plus (+) memperlambat highlight.
+                            <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed italic">
+                              💡 <strong>Highlight terlalu lambat (tertinggal)?</strong> Geser ke minus (-). <strong>Highlight terlalu cepat (mendahului)?</strong> Geser ke plus (+). Pengaturan tersimpan otomatis.
                             </p>
                           </div>
                         )}
@@ -907,11 +921,12 @@ export const QuranView: React.FC<QuranViewProps> = ({
                         currentTime={audioProgress.currentTime}
                         duration={audioProgress.duration}
                         syncOffsetMs={syncOffsetMs}
+                        wordTimings={surahWordTimings[ayah.numberInSurah] || null}
                         enableTajwid={enableTajwid}
                         fontStyle={quranFontStyle}
                         fontSizeClass={getFontSizeClass()}
                         showAyahEndMarker={ayah.numberInSurah}
-                        onWordClick={isPlayingThis ? (_idx, pct) => handleSeekAyah(pct) : undefined}
+                        onWordClick={isPlayingThis ? (_idx, pct, sec) => handleSeekAyah(pct, sec) : undefined}
                       />
                     </div>
 

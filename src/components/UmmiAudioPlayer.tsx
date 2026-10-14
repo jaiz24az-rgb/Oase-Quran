@@ -306,37 +306,37 @@ export const UmmiAudioPlayer: React.FC<UmmiAudioPlayerProps> = ({
 
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Preset Cepat:</span>
-            {[-150, -75, 0, 75, 150].map((preset) => (
+            {[-200, -100, 0, 100, 200].map((preset) => (
               <button
                 key={preset}
                 onClick={() => handleSyncOffsetChange(preset)}
                 className={`px-2 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
                   playerState.syncOffsetMs === preset
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs font-bold'
                     : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
                 }`}
               >
-                {preset === 0 ? '0ms (Standar Optimal)' : preset < 0 ? `${preset}ms (Cepat)` : `+${preset}ms (Lambat)`}
+                {preset === 0 ? 'Normal (0ms)' : preset < 0 ? `${preset}ms (Maju Cepat)` : `+${preset}ms (Tahan Lambat)`}
               </button>
             ))}
           </div>
 
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-[10px] text-slate-500 font-mono shrink-0">-300ms</span>
+            <span className="text-[10px] text-slate-500 font-mono shrink-0">-500ms</span>
             <input
               type="range"
-              min="-300"
-              max="300"
+              min="-500"
+              max="500"
               step="25"
               value={playerState.syncOffsetMs}
               onChange={(e) => handleSyncOffsetChange(parseInt(e.target.value, 10))}
               className="w-full h-1.5 bg-emerald-100 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-600"
             />
-            <span className="text-[10px] text-slate-500 font-mono shrink-0">+300ms</span>
+            <span className="text-[10px] text-slate-500 font-mono shrink-0">+500ms</span>
           </div>
 
           <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed italic">
-            💡 Pilih nilai minus (-) jika menggunakan earphone Bluetooth atau jika highlight terasa tertinggal. Pengaturan ini otomatis tersimpan untuk seluruh ayat dan doa.
+            💡 <strong>Highlight terlalu lambat (tertinggal)?</strong> Geser ke minus (-). <strong>Highlight terlalu cepat (mendahului)?</strong> Geser ke plus (+). Pengaturan tersimpan otomatis untuk seluruh audio.
           </p>
         </div>
       )}

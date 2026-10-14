@@ -168,7 +168,7 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
               Jadwal Waktu Sholat & Imsakiyah Hisab Hakiki
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-              Pedoman hisab astronomis akurat, penetapan awal waktu Subuh -18° & Kalender Hijriah Global Tunggal (KHGT). Wilayah <strong className="text-slate-800 dark:text-slate-200">{location.name}</strong> ({Math.abs(location.latitude).toFixed(4)}° {location.latitude >= 0 ? 'LU' : 'LS'}, {Math.abs(location.longitude).toFixed(4)}° {location.longitude >= 0 ? 'BT' : 'BB'}).
+              Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, jadwal ini disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah, yang mendukung penyatuan waktu ibadah umat Islam secara global. Wilayah <strong className="text-slate-800 dark:text-slate-200">{location.name}</strong> ({Math.abs(location.latitude).toFixed(4)}° {location.latitude >= 0 ? 'LU' : 'LS'}, {Math.abs(location.longitude).toFixed(4)}° {location.longitude >= 0 ? 'BT' : 'BB'}).
             </p>
           </div>
         </div>
@@ -202,7 +202,7 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
               {nextPrayer ? `Menjelang Sholat ${nextPrayer.name}` : 'Jadwal Sholat Harian'}
             </h1>
             <p className="text-emerald-100/90 text-sm max-w-lg">
-              Perhitungan astronomis akurat dengan parameter resmi awal waktu Subuh -18° di bawah ufuk.
+              Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, jadwal ini disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah, yang mendukung penyatuan waktu ibadah umat Islam secara global.
             </p>
           </div>
 
@@ -351,10 +351,10 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
         <Info className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="font-semibold text-emerald-800 dark:text-emerald-300">
-            Penetapan Awal Waktu Subuh -18 Derajat (Hisab Astronomis Ilmiah)
+            Metode Hisab Hakiki Kontemporer & Kalender Hijriah Global Tunggal (KHGT)
           </p>
           <p className="text-emerald-700/90 dark:text-emerald-300/80 leading-relaxed">
-            Kajian astronomis ilmiah menetapkan bahwa awal waktu Subuh dimulai saat ketinggian matahari berada pada -18° di bawah ufuk. Ketetapan ini mengoreksi parameter lama (-20°), sehingga waktu Subuh mundur sekitar 8 menit lebih lambat agar benar-benar sesuai dengan kemunculan Fajar Shadiq.
+            Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, jadwal ini disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah, yang mendukung penyatuan waktu ibadah umat Islam secara global. Penetapan awal waktu Subuh menggunakan posisi matahari -18° di bawah ufuk untuk memastikan keabsahan waktu fajar shadiq.
           </p>
         </div>
       </div>

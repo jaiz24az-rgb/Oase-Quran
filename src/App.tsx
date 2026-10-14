@@ -411,7 +411,7 @@ export default function App() {
             Oase-Muslim: Aplikasi Muslim Terpadu
           </p>
           <p className="max-w-2xl mx-auto leading-relaxed">
-            Dilengkapi jadwal waktu sholat hisab astronomis kontemporer (Subuh -18°), penunjuk arah kiblat peta satelit, dzikir & doa harian, Al-Qur'an Mushaf Indonesia dengan Tajwid Berwarna, Modul Tahfizh Doa, serta Kalender Hijriah Global Tunggal (KHGT).
+            Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, jadwal ini disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah, yang mendukung penyatuan waktu ibadah umat Islam secara global. Dilengkapi penunjuk arah kiblat presisi, dzikir & doa harian, Al-Qur'an Mushaf Indonesia dengan Tajwid Berwarna, Modul Tahfizh Doa, serta Kalender Hijriah Global Tunggal (KHGT).
           </p>
           <p className="text-[11px] text-slate-400 dark:text-slate-500 pt-2">
             © {new Date().getFullYear()} Oase-Muslim • Aplikasi Muslim Terpadu

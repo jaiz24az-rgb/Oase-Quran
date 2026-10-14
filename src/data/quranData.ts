@@ -197,7 +197,7 @@ export async function fetchSurahVerses(surahNumber: number): Promise<QuranAyah[]
           text: item.teksArab,
           translation: item.teksIndonesia,
           transliteration: item.teksLatin,
-          audioUrl: item.audio ? (item.audio['01'] || item.audio['05'] || Object.values(item.audio)[0]) : undefined,
+          audioUrl: item.audio ? (item.audio['05'] || item.audio['01'] || Object.values(item.audio)[0]) : undefined,
         }));
       }
     }

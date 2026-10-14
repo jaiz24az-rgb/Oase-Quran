@@ -36,6 +36,8 @@ import confetti from 'canvas-confetti';
 import { SURAH_LIST, fetchSurahVerses, LOCAL_SURAHS_MAP } from '../data/quranData';
 import { QuranAyah, QuranSurah } from '../types';
 import { renderTajwidText } from '../utils/tajwidHighlighter';
+import { SynchronizedArabicText } from './SynchronizedArabicText';
+import { getSurahWordTimings, WordTimingSegment } from '../utils/quranTimingService';
 
 interface QuranMemorizeSHQViewProps {
   initialSurahNumber?: number;
@@ -115,7 +117,14 @@ export const QuranMemorizeSHQView: React.FC<QuranMemorizeSHQViewProps> = ({
   const [repeatTarget, setRepeatTarget] = useState<number>(5); // 3x, 5x, 10x loop
   const [currentRepeatCount, setCurrentRepeatCount] = useState<number>(0);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
+  const [audioProgress, setAudioProgress] = useState<{ currentTime: number; duration: number; progressPercent: number }>({
+    currentTime: 0,
+    duration: 0,
+    progressPercent: 0,
+  });
+  const [surahWordTimings, setSurahWordTimings] = useState<Record<number, WordTimingSegment[]>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   // Active Recall States
   const [recallMode, setRecallMode] = useState<'blanking' | 'blind'>('blanking');
@@ -214,6 +223,12 @@ export const QuranMemorizeSHQView: React.FC<QuranMemorizeSHQViewProps> = ({
         }
       });
 
+    getSurahWordTimings(selectedSurah.number).then((timings) => {
+      if (isMounted) {
+        setSurahWordTimings(timings);
+      }
+    });
+
     return () => {
       isMounted = false;
     };
@@ -264,28 +279,63 @@ export const QuranMemorizeSHQView: React.FC<QuranMemorizeSHQViewProps> = ({
     setIsBlindRevealed(false);
   };
 
-  // Audio Playback Handler with Auto-Repeat Counter
+  // Audio Playback Handler with Auto-Repeat Counter and Real-time Progress Tracking
+  const startRafTicker = (audio: HTMLAudioElement) => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    let last = -1;
+    const tick = () => {
+      if (audioRef.current === audio && !audio.paused && !audio.ended) {
+        const cur = audio.currentTime;
+        if (Math.abs(cur - last) >= 0.025) {
+          last = cur;
+          const dur = !isNaN(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+          const pct = dur > 0 ? (cur / dur) * 100 : 0;
+          setAudioProgress({ currentTime: cur, duration: dur, progressPercent: pct });
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        rafRef.current = null;
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  };
+
   const handlePlayAudio = () => {
     if (!activeVerse) return;
 
     if (!audioRef.current) {
       const audioUrl =
         activeVerse.audioUrl ||
-        `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${activeVerse.number}.mp3`;
-      audioRef.current = new Audio(audioUrl);
+        `https://everyayah.com/data/Alafasy_128kbps/${String(selectedSurah.number).padStart(3, '0')}${String(activeVerse.numberInSurah).padStart(3, '0')}.mp3`;
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
 
-      audioRef.current.onended = () => {
+      audio.ontimeupdate = () => {
+        const cur = audio.currentTime;
+        const dur = !isNaN(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+        const pct = dur > 0 ? (cur / dur) * 100 : 0;
+        setAudioProgress({ currentTime: cur, duration: dur, progressPercent: pct });
+      };
+
+      audio.onended = () => {
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
         setCurrentRepeatCount((prev) => {
           const next = prev + 1;
           if (next < repeatTarget) {
             // Loop again
             if (audioRef.current) {
               audioRef.current.currentTime = 0;
-              audioRef.current.play().catch(() => {});
+              audioRef.current.play().then(() => {
+                if (audioRef.current) startRafTicker(audioRef.current);
+              }).catch(() => {});
             }
             return next;
           } else {
             setIsPlayingAudio(false);
+            setAudioProgress({ currentTime: 0, duration: 0, progressPercent: 0 });
             return next;
           }
         });
@@ -295,19 +345,33 @@ export const QuranMemorizeSHQView: React.FC<QuranMemorizeSHQViewProps> = ({
     if (isPlayingAudio) {
       audioRef.current.pause();
       setIsPlayingAudio(false);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     } else {
-      audioRef.current.play().catch(() => {});
-      setIsPlayingAudio(true);
+      audioRef.current.play().then(() => {
+        setIsPlayingAudio(true);
+        if (audioRef.current) startRafTicker(audioRef.current);
+      }).catch(() => {
+        setIsPlayingAudio(false);
+      });
     }
   };
 
   // Stop audio on unmount or ayah change
   useEffect(() => {
     return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      setIsPlayingAudio(false);
+      setAudioProgress({ currentTime: 0, duration: 0, progressPercent: 0 });
     };
   }, [currentAyahIndex, currentStep]);
 
@@ -775,12 +839,20 @@ export const QuranMemorizeSHQView: React.FC<QuranMemorizeSHQViewProps> = ({
                       </div>
                     </div>
 
-                    <p
-                      dir="rtl"
-                      className="font-indonesia text-2xl sm:text-3xl text-emerald-300 leading-relaxed"
-                    >
-                      {activeVerse.text}
-                    </p>
+                    <div className="py-2">
+                      <SynchronizedArabicText
+                        text={activeVerse.text}
+                        isPlaying={isPlayingAudio}
+                        progressPercent={audioProgress.progressPercent}
+                        currentTime={audioProgress.currentTime}
+                        duration={audioProgress.duration}
+                        wordTimings={surahWordTimings[activeVerse.numberInSurah] || null}
+                        fontStyle="indonesia"
+                        fontSizeClass="text-2xl sm:text-3xl text-emerald-200"
+                        showAyahEndMarker={activeVerse.numberInSurah}
+                        allowWordSeek={false}
+                      />
+                    </div>
 
                     {/* Audio Controls */}
                     <div className="flex items-center justify-center gap-4">
