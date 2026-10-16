@@ -12,6 +12,7 @@ import {
   Moon,
   Sparkles,
   Layers,
+  HeartPulse,
   FileDown,
   Download,
 } from 'lucide-react';
@@ -206,19 +207,57 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* TAB 2: Al-Qur'an Indonesia (Berkumpul: Mushaf, Hafal SHQ, Quran Mapping) */}
-          <button
-            id="nav-tab-quran"
-            onClick={() => setActiveTab('quran')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === 'quran' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-mapping'
+          {/* TAB 2: Al-Qur'an Indonesia (Berkumpul: Mushaf, Hafal SHQ, Quran Mapping, Quran Medis) */}
+          <div
+            className={`flex items-center rounded-lg transition-all ${
+              activeTab === 'quran' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-mapping' || activeTab === 'quran-medis'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
-            <span>Al-Qur'an Indonesia</span>
-          </button>
+            <button
+              id="nav-tab-quran"
+              onClick={() => setActiveTab('quran')}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium whitespace-nowrap cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Al-Qur'an Indonesia</span>
+            </button>
+
+            {/* Small 1-Tap Quran Mapping Icon Button */}
+            <button
+              id="nav-subtab-mapping"
+              onClick={() => setActiveTab('quran-mapping')}
+              className={`mr-1 px-2 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                activeTab === 'quran-mapping'
+                  ? 'bg-teal-400 text-slate-900 shadow-xs ring-1 ring-white/50'
+                  : activeTab === 'quran' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-medis'
+                  ? 'bg-emerald-700 hover:bg-emerald-800 text-teal-200 hover:text-white'
+                  : 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800'
+              }`}
+              title="Quran Mapping 114 Surah"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Mapping</span>
+            </button>
+
+            {/* Small 1-Tap Quran Medis Icon Button right beside Mapping */}
+            <button
+              id="nav-subtab-medis"
+              onClick={() => setActiveTab('quran-medis')}
+              className={`mr-1 px-2 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                activeTab === 'quran-medis'
+                  ? 'bg-rose-400 text-slate-900 shadow-xs ring-1 ring-white/50'
+                  : activeTab === 'quran' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-mapping'
+                  ? 'bg-emerald-700 hover:bg-emerald-800 text-rose-200 hover:text-white'
+                  : 'bg-rose-50 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 hover:bg-rose-100 border border-rose-200 dark:border-rose-800'
+              }`}
+              title="Quran Medis: Medis Qur'an & Hadist Bergambar"
+            >
+              <HeartPulse className="w-3.5 h-3.5 text-rose-300" />
+              <span className="hidden lg:inline">Medis</span>
+            </button>
+          </div>
 
           {/* TAB 3: Doa & Sholat + 1-Tap Hafalan */}
           <div

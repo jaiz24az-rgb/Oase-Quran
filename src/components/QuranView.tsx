@@ -1,19 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BookOpen, Search, Volume2, Pause, Play, Square, Bookmark, BookmarkCheck, Sparkles, SlidersHorizontal, Info, ChevronLeft, ChevronRight, ChevronDown, X, Eye, EyeOff, Layers, Brain, ArrowRight } from 'lucide-react';
+import { BookOpen, Search, Volume2, Volume1, VolumeX, Pause, Play, Square, Bookmark, BookmarkCheck, Sparkles, SlidersHorizontal, Info, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, Eye, EyeOff, Layers, Brain, ArrowRight, Maximize2, Minimize2, HeartPulse } from 'lucide-react';
 import { SURAH_LIST, fetchSurahVerses, LOCAL_SURAHS_MAP } from '../data/quranData';
 import { QuranAyah, QuranSurah } from '../types';
 import { renderTajwidText, TAJWID_RULES } from '../utils/tajwidHighlighter';
 import { SynchronizedArabicText } from './SynchronizedArabicText';
 import { QuranMappingView } from './QuranMappingView';
 import { QuranMemorizeSHQView } from './QuranMemorizeSHQView';
+import { QuranMedisView } from './QuranMedisView';
 import { getSurahWordTimings, WordTimingSegment } from '../utils/quranTimingService';
 
 interface QuranViewProps {
   initialSurahNumber?: number;
-  initialMode?: 'mushaf' | 'shq' | 'mapping';
+  initialMode?: 'mushaf' | 'shq' | 'mapping' | 'medis';
   onOpenQuranMapping?: (surahNumber: number) => void;
   onOpenQuranMemorize?: (surahNumber: number) => void;
+  onOpenQuranMedis?: () => void;
   isLandscapeFullscreen?: boolean;
+  isFocusMode?: boolean;
+  onToggleFocusMode?: () => void;
 }
 
 export const QuranView: React.FC<QuranViewProps> = ({
@@ -21,17 +25,20 @@ export const QuranView: React.FC<QuranViewProps> = ({
   initialMode = 'mushaf',
   onOpenQuranMapping,
   onOpenQuranMemorize,
+  onOpenQuranMedis,
   isLandscapeFullscreen,
+  isFocusMode,
+  onToggleFocusMode,
 }) => {
-  // Check if device is in compact landscape mode (phone rotated horizontally)
+  // Check if device is in compact landscape mode (phone or small tablet rotated horizontally)
   const [internalCompactLandscape, setInternalCompactLandscape] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.matchMedia('(orientation: landscape) and (max-height: 560px)').matches;
+    return window.matchMedia('(orientation: landscape) and (max-height: 700px)').matches;
   });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const media = window.matchMedia('(orientation: landscape) and (max-height: 560px)');
+    const media = window.matchMedia('(orientation: landscape) and (max-height: 700px)');
     const check = () => setInternalCompactLandscape(media.matches);
     check();
     media.addEventListener('change', check);
@@ -42,9 +49,13 @@ export const QuranView: React.FC<QuranViewProps> = ({
     };
   }, []);
 
-  const isLandscapeCompact = isLandscapeFullscreen ?? internalCompactLandscape;
+  const [internalFocusMode, setInternalFocusMode] = useState<boolean>(false);
+  const activeFocusMode = isFocusMode ?? internalFocusMode;
+  const toggleFocusMode = onToggleFocusMode ?? (() => setInternalFocusMode((prev) => !prev));
+  const isLandscapeCompact = isLandscapeFullscreen || internalCompactLandscape;
+  const isLandscapeOrFocus = isLandscapeCompact || activeFocusMode;
 
-  const [viewMode, setViewMode] = useState<'mushaf' | 'shq' | 'mapping'>(initialMode);
+  const [viewMode, setViewMode] = useState<'mushaf' | 'shq' | 'mapping' | 'medis'>(initialMode);
   const [selectedSurah, setSelectedSurah] = useState<QuranSurah>(() => {
     if (initialSurahNumber) {
       return SURAH_LIST.find((s) => s.number === initialSurahNumber) || SURAH_LIST[0];
@@ -114,8 +125,15 @@ export const QuranView: React.FC<QuranViewProps> = ({
     duration: number;
     progressPercent: number;
   }>({ currentTime: 0, duration: 0, progressPercent: 0 });
+  const [isPlayerMinimized, setIsPlayerMinimized] = useState<boolean>(false);
+  const [audioNotice, setAudioNotice] = useState<string | null>(null);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rafRef = useRef<number | null>(null);
+  const candidateIndexRef = useRef<number>(0);
+  const currentCandidatesRef = useRef<string[]>([]);
+  const retryTimeoutRef = useRef<number | null>(null);
+  const wakeLockRef = useRef<any>(null);
 
   // Audio & Highlight sync calibration
   const [syncOffsetMs, setSyncOffsetMs] = useState<number>(() => {
@@ -128,6 +146,125 @@ export const QuranView: React.FC<QuranViewProps> = ({
   });
   const [showSyncTuner, setShowSyncTuner] = useState<boolean>(false);
   const [autoFollowAyah, setAutoFollowAyah] = useState<boolean>(true);
+
+  // Volume controls & auto-hide popover state
+  const [audioVolume, setAudioVolume] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tarjih_quran_audio_volume');
+      return saved !== null ? Math.max(0, Math.min(100, parseInt(saved, 10))) : 100;
+    } catch {
+      return 100;
+    }
+  });
+  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState<boolean>(false);
+  const volumeHideTimerRef = useRef<number | null>(null);
+  const volumeContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-hide player bar state (automatically collapses into mini pill after 5s of quiet reading)
+  const [autoHidePlayer, setAutoHidePlayer] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('tarjih_quran_player_autohide') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const playerAutoHideTimerRef = useRef<number | null>(null);
+
+  const resetPlayerAutoHideTimer = () => {
+    if (playerAutoHideTimerRef.current) {
+      clearTimeout(playerAutoHideTimerRef.current);
+      playerAutoHideTimerRef.current = null;
+    }
+    if (autoHidePlayer && isPlayingAudio && !isPlayerMinimized) {
+      playerAutoHideTimerRef.current = window.setTimeout(() => {
+        setIsPlayerMinimized(true);
+      }, 5000);
+    }
+  };
+
+  const toggleAutoHidePlayer = () => {
+    setAutoHidePlayer((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('tarjih_quran_player_autohide', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const resetVolumeHideTimer = () => {
+    if (volumeHideTimerRef.current) {
+      clearTimeout(volumeHideTimerRef.current);
+    }
+    // Automatically hide slider after 3 seconds of inactivity
+    volumeHideTimerRef.current = window.setTimeout(() => {
+      setShowVolumeSlider(false);
+    }, 3000);
+  };
+
+  const handleToggleVolumeSlider = () => {
+    if (!showVolumeSlider) {
+      setShowVolumeSlider(true);
+      resetVolumeHideTimer();
+    } else {
+      setShowVolumeSlider(false);
+      if (volumeHideTimerRef.current) clearTimeout(volumeHideTimerRef.current);
+    }
+  };
+
+  const handleVolumeChange = (newVal: number) => {
+    const clamped = Math.max(0, Math.min(100, newVal));
+    setAudioVolume(clamped);
+    if (clamped > 0 && isAudioMuted) {
+      setIsAudioMuted(false);
+    }
+    try {
+      localStorage.setItem('tarjih_quran_audio_volume', String(clamped));
+    } catch {
+      // ignore
+    }
+    resetVolumeHideTimer();
+  };
+
+  // Sync volume with active audio element
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isAudioMuted ? 0 : audioVolume / 100;
+    }
+  }, [audioVolume, isAudioMuted]);
+
+  // Click outside to automatically hide volume slider
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (volumeContainerRef.current && !volumeContainerRef.current.contains(e.target as Node)) {
+        setShowVolumeSlider(false);
+      }
+    };
+    if (showVolumeSlider) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showVolumeSlider]);
+
+  // Screen Wake Lock & Tab Visibility listener: keeps recitation running & re-acquires lock on return
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && isPlayingAudio) {
+        acquireWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isPlayingAudio]);
 
   // Auto-follow active ayah: screen automatically follows currently playing verse without manual scrolling
   useEffect(() => {
@@ -192,6 +329,28 @@ export const QuranView: React.FC<QuranViewProps> = ({
     };
   }, [selectedSurah.number]);
 
+  // Screen Wake Lock helper to keep display on and prevent audio suspension during long recitations
+  const acquireWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator && !wakeLockRef.current) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+      }
+    } catch {
+      // Ignored if wake lock is unsupported or restricted
+    }
+  };
+
+  const releaseWakeLock = () => {
+    if (wakeLockRef.current) {
+      try {
+        wakeLockRef.current.release();
+      } catch {
+        // ignore
+      }
+      wakeLockRef.current = null;
+    }
+  };
+
   // High-precision ticker for real-time highlighting
   const startRafTicker = (audioInstance: HTMLAudioElement) => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -217,22 +376,95 @@ export const QuranView: React.FC<QuranViewProps> = ({
     rafRef.current = requestAnimationFrame(tick);
   };
 
-  // Audio controller
+  // Reference for preloading next ayah audio to eliminate gap during long surahs
+  const nextAudioPreloadRef = useRef<HTMLAudioElement | null>(null);
+
+  // Helper to compute global ayah number (1 to 6236) across the entire Qur'an
+  const getGlobalAyahNumber = (surahNum: number, ayahNum: number): number => {
+    let count = 0;
+    for (const s of SURAH_LIST) {
+      if (s.number < surahNum) {
+        count += s.numberOfAyahs;
+      } else {
+        break;
+      }
+    }
+    return count + ayahNum;
+  };
+
+  // Generate multi-CDN fallback candidates for any ayah
+  const getAyahAudioCandidates = (surahNum: number, ayahNum: number, preferredUrl?: string): string[] => {
+    const sPad = String(surahNum).padStart(3, '0');
+    const aPad = String(ayahNum).padStart(3, '0');
+    const globalAyah = getGlobalAyahNumber(surahNum, ayahNum);
+    const list: string[] = [];
+    if (preferredUrl) list.push(preferredUrl);
+    // Source 1: EveryAyah Mishary Rashid Alafasy 128kbps (high reliability standard)
+    list.push(`https://everyayah.com/data/Alafasy_128kbps/${sPad}${aPad}.mp3`);
+    // Source 2: Quran.com Audio CDN mirror
+    list.push(`https://verses.quran.com/Alafasy/mp3/${sPad}${aPad}.mp3`);
+    // Source 3: Islamic Network CDN (global ayah index)
+    list.push(`https://cdn.islamic.network/quran/audio/128/ar.alafasy/${globalAyah}.mp3`);
+    return Array.from(new Set(list));
+  };
+
+  // Silently preload next ayah's audio while current verse is reciting to guarantee gapless transition
+  const preloadNextAyah = (nextAyahNum: number) => {
+    if (nextAyahNum <= verses.length) {
+      const nextAyah = verses.find((v) => v.numberInSurah === nextAyahNum);
+      const candidates = getAyahAudioCandidates(selectedSurah.number, nextAyahNum, nextAyah?.audioUrl);
+      if (candidates.length > 0) {
+        if (!nextAudioPreloadRef.current) {
+          nextAudioPreloadRef.current = new Audio();
+        }
+        nextAudioPreloadRef.current.src = candidates[0];
+        nextAudioPreloadRef.current.preload = 'auto';
+        nextAudioPreloadRef.current.load();
+      }
+    }
+  };
+
+  // Get or initialize persistent audio element (reused across all verses to prevent Autoplay blocks)
+  const getOrCreateAudio = (): HTMLAudioElement => {
+    if (!audioRef.current) {
+      const audio = new Audio();
+      audioRef.current = audio;
+    }
+    return audioRef.current;
+  };
+
+  // Resilient Audio Controller: Supports full long surahs (e.g. Al-Baqarah 286 ayahs) without stopping
   const handlePlayAyahAudio = (ayahNumber: number, audioUrl?: string) => {
     if (currentPlayingAyah === ayahNumber && isPlayingAudio) {
       stopAudio();
       return;
     }
 
-    stopAudio();
-    // Default reliable everyayah CDN if audioUrl not provided
-    const surahPadded = String(selectedSurah.number).padStart(3, '0');
-    const ayahPadded = String(ayahNumber).padStart(3, '0');
-    const finalAudioUrl =
-      audioUrl || `https://everyayah.com/data/Alafasy_128kbps/${surahPadded}${ayahPadded}.mp3`;
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
 
-    const audio = new Audio(finalAudioUrl);
-    audioRef.current = audio;
+    const candidates = getAyahAudioCandidates(selectedSurah.number, ayahNumber, audioUrl);
+    currentCandidatesRef.current = candidates;
+    candidateIndexRef.current = 0;
+
+    playCandidateForAyah(ayahNumber, 0);
+  };
+
+  const playCandidateForAyah = (ayahNumber: number, candidateIdx: number) => {
+    const audio = getOrCreateAudio();
+    const candidateUrl = currentCandidatesRef.current[candidateIdx] || currentCandidatesRef.current[0];
+
+    // Detach old listeners before loading new source
+    audio.ontimeupdate = null;
+    audio.onended = null;
+    audio.onerror = null;
+
+    audio.src = candidateUrl;
+    audio.preload = 'auto';
+    audio.volume = isAudioMuted ? 0 : audioVolume / 100;
+    audio.load();
 
     audio.ontimeupdate = () => {
       const cur = audio.currentTime;
@@ -249,11 +481,47 @@ export const QuranView: React.FC<QuranViewProps> = ({
       setIsPlayingAudio(true);
       setCurrentPlayingAyah(ayahNumber);
       startRafTicker(audio);
+      acquireWakeLock();
+      resetPlayerAutoHideTimer();
+
+      // Preload next verse so long recitations never pause for buffering
+      preloadNextAyah(ayahNumber + 1);
+
+      // Setup MediaSession for background & lockscreen playback (informing OS that playback is continuous)
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.playbackState = 'playing';
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: `Ayat ${ayahNumber} • QS. ${selectedSurah.englishName}`,
+            artist: 'Syekh Misyari Rasyid Al-Afasy',
+            album: "Mushaf Al-Qur'an Indonesia",
+          });
+          navigator.mediaSession.setActionHandler('play', () => {
+            audio.play().catch(console.warn);
+          });
+          navigator.mediaSession.setActionHandler('pause', () => {
+            audio.pause();
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+          });
+          navigator.mediaSession.setActionHandler('nexttrack', () => {
+            if (ayahNumber < verses.length) {
+              const nextAyah = verses.find((v) => v.numberInSurah === ayahNumber + 1);
+              handlePlayAyahAudio(ayahNumber + 1, nextAyah?.audioUrl);
+            }
+          });
+          navigator.mediaSession.setActionHandler('previoustrack', () => {
+            if (ayahNumber > 1) {
+              const prevAyah = verses.find((v) => v.numberInSurah === ayahNumber - 1);
+              handlePlayAyahAudio(ayahNumber - 1, prevAyah?.audioUrl);
+            }
+          });
+        } catch {
+          // ignore
+        }
+      }
     }).catch((err) => {
-      console.warn('Audio playback error:', err);
-      setIsPlayingAudio(false);
-      setCurrentPlayingAyah(null);
-      setAudioProgress({ currentTime: 0, duration: 0, progressPercent: 0 });
+      console.warn(`Autoplay or fetch error on candidate ${candidateIdx + 1} (${candidateUrl}) for Ayat ${ayahNumber}:`, err);
+      tryNextCandidateOrSkip(ayahNumber, candidateIdx);
     });
 
     audio.onended = () => {
@@ -261,25 +529,44 @@ export const QuranView: React.FC<QuranViewProps> = ({
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      // Auto play next verse
+      // Continuous playback for entire surah regardless of length (e.g. Al-Baqarah 286 ayahs)
       if (ayahNumber < verses.length) {
-        handlePlayAyahAudio(ayahNumber + 1);
+        const nextAyahNumber = ayahNumber + 1;
+        const nextAyah = verses.find((v) => v.numberInSurah === nextAyahNumber);
+        handlePlayAyahAudio(nextAyahNumber, nextAyah?.audioUrl);
       } else {
-        setIsPlayingAudio(false);
-        setCurrentPlayingAyah(null);
-        setAudioProgress({ currentTime: 0, duration: 0, progressPercent: 0 });
+        stopAudio();
       }
     };
 
     audio.onerror = () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      setIsPlayingAudio(false);
-      setCurrentPlayingAyah(null);
-      setAudioProgress({ currentTime: 0, duration: 0, progressPercent: 0 });
+      console.warn(`Audio error on candidate ${candidateIdx + 1} for Ayat ${ayahNumber}`);
+      tryNextCandidateOrSkip(ayahNumber, candidateIdx);
     };
+  };
+
+  const tryNextCandidateOrSkip = (ayahNumber: number, failedIdx: number) => {
+    const nextIdx = failedIdx + 1;
+    if (nextIdx < currentCandidatesRef.current.length) {
+      candidateIndexRef.current = nextIdx;
+      console.info(`Switching to backup audio mirror ${nextIdx + 1} for Ayat ${ayahNumber}...`);
+      playCandidateForAyah(ayahNumber, nextIdx);
+    } else {
+      // All candidate mirrors failed for this single verse
+      console.warn(`All audio sources unavailable for Surah ${selectedSurah.number} Ayat ${ayahNumber}. Auto-recovering to next verse.`);
+      setAudioNotice(`Ayat ${ayahNumber} dialihkan otomatis karena jaringan audio, lanjut ayat ${ayahNumber + 1}...`);
+      setTimeout(() => setAudioNotice(null), 3500);
+
+      if (ayahNumber < verses.length) {
+        const nextAyahNumber = ayahNumber + 1;
+        const nextAyah = verses.find((v) => v.numberInSurah === nextAyahNumber);
+        retryTimeoutRef.current = window.setTimeout(() => {
+          handlePlayAyahAudio(nextAyahNumber, nextAyah?.audioUrl);
+        }, 500);
+      } else {
+        stopAudio();
+      }
+    }
   };
 
   const handleSeekAyah = (targetPercent: number, targetTimeSec?: number) => {
@@ -294,9 +581,29 @@ export const QuranView: React.FC<QuranViewProps> = ({
   };
 
   const stopAudio = () => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
+    }
+    if (playerAutoHideTimerRef.current) {
+      clearTimeout(playerAutoHideTimerRef.current);
+      playerAutoHideTimerRef.current = null;
+    }
+    setShowVolumeSlider(false);
+    if (volumeHideTimerRef.current) {
+      clearTimeout(volumeHideTimerRef.current);
+      volumeHideTimerRef.current = null;
+    }
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.playbackState = 'none';
+      } catch {
+        // ignore
+      }
     }
     if (audioRef.current) {
       audioRef.current.pause();
@@ -304,11 +611,11 @@ export const QuranView: React.FC<QuranViewProps> = ({
       audioRef.current.onended = null;
       audioRef.current.onerror = null;
       audioRef.current.currentTime = 0;
-      audioRef.current = null;
     }
     setIsPlayingAudio(false);
     setCurrentPlayingAyah(null);
     setAudioProgress({ currentTime: 0, duration: 0, progressPercent: 0 });
+    releaseWakeLock();
   };
 
   const saveLastRead = (ayahNumber: number) => {
@@ -365,9 +672,9 @@ export const QuranView: React.FC<QuranViewProps> = ({
   };
 
   return (
-    <div className={`transition-all ${isLandscapeCompact ? 'space-y-2' : 'space-y-6'}`}>
-      {/* 3-Segment Sub-Nav: Hidden in compact landscape to maximize reading viewport */}
-      <div className={`bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs items-center justify-between gap-1.5 ${isLandscapeCompact ? 'hidden' : 'flex'}`}>
+    <div className={`transition-all ${isLandscapeOrFocus ? 'space-y-2' : 'space-y-6'}`}>
+      {/* 3-Segment Sub-Nav: Hidden in compact landscape / focus mode to maximize reading viewport */}
+      <div className={`bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs items-center justify-between gap-1.5 ${isLandscapeOrFocus ? 'hidden' : 'flex'}`}>
         <button
           id="quran-mode-mushaf"
           onClick={() => {
@@ -415,6 +722,24 @@ export const QuranView: React.FC<QuranViewProps> = ({
           <Layers className="w-4 h-4 text-teal-500 dark:text-teal-400" />
           <span>Quran Mapping</span>
         </button>
+
+        {/* Mode Quran Medis right beside Quran Mapping */}
+        <button
+          id="quran-mode-medis"
+          onClick={() => {
+            setViewMode('medis');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            viewMode === 'medis'
+              ? 'bg-rose-600 text-white shadow-xs font-extrabold'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70'
+          }`}
+          title="Buka Pengetahuan Medis Al-Qur'an & Hadist Bergambar"
+        >
+          <HeartPulse className="w-4 h-4 text-rose-500 dark:text-rose-400" />
+          <span>Quran Medis</span>
+        </button>
       </div>
 
       {/* Mode 1: Hafal Qur'an SHQ (Terpadu di Al-Qur'an Indonesia) */}
@@ -447,11 +772,27 @@ export const QuranView: React.FC<QuranViewProps> = ({
         />
       )}
 
+      {/* Mode 3: Quran Medis (Terpadu di Al-Qur'an Indonesia) */}
+      {viewMode === 'medis' && (
+        <QuranMedisView
+          onNavigateToQuran={(surahNum) => {
+            const s = SURAH_LIST.find((item) => item.number === surahNum);
+            if (s) setSelectedSurah(s);
+            setViewMode('mushaf');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onClose={() => {
+            setViewMode('mushaf');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
       {/* Mode 3: Mushaf & Terjemahan */}
       {viewMode === 'mushaf' && (
         <>
-          {/* Quran Header Toolbar (Hidden in compact landscape to maximize reading space) */}
-          <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isLandscapeCompact ? 'hidden' : 'p-5 flex'}`}>
+          {/* Quran Header Toolbar (Hidden in compact landscape / focus mode to maximize reading space) */}
+          <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isLandscapeOrFocus ? 'hidden' : 'p-5 flex'}`}>
         <div>
           <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold text-xs sm:text-sm uppercase tracking-wider">
             <BookOpen className="w-4 h-4" />
@@ -486,6 +827,17 @@ export const QuranView: React.FC<QuranViewProps> = ({
           >
             <Layers className="w-3.5 h-3.5" />
             <span>Quran Mapping</span>
+          </button>
+
+          {/* Open Quran Medis right beside Quran Mapping */}
+          <button
+            id="quran-toolbar-btn-medis"
+            onClick={() => setViewMode('medis')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            title="Buka Pengetahuan Medis Al-Qur'an & Hadist Bergambar"
+          >
+            <HeartPulse className="w-3.5 h-3.5 text-rose-200" />
+            <span>Quran Medis</span>
           </button>
 
           {/* Open Quran Memorize SHQ for this Surah */}
@@ -625,34 +977,36 @@ export const QuranView: React.FC<QuranViewProps> = ({
       )}
 
       {/* Quick Surah Navigator Bar: Immediately visible at top, compact in landscape */}
-      <div className={`bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between gap-1.5 ${isLandscapeCompact ? 'p-1' : 'p-2.5 sm:p-3.5'}`}>
-        <button
-          onClick={handlePrevSurah}
-          disabled={selectedSurah.number <= 1}
-          className={`rounded-lg sm:rounded-xl text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer shrink-0 ${isLandscapeCompact ? 'px-2 py-1' : 'px-2.5 sm:px-3 py-2'}`}
-          title="Surah Sebelumnya"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Sebelumnya</span>
-        </button>
+      <div className={`bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-wrap items-center justify-between gap-1.5 ${isLandscapeOrFocus ? 'p-1 sm:p-1.5' : 'p-2 sm:p-3'}`}>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handlePrevSurah}
+            disabled={selectedSurah.number <= 1}
+            className={`rounded-lg sm:rounded-xl text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer shrink-0 ${isLandscapeOrFocus ? 'px-2 py-1' : 'px-2.5 sm:px-3 py-2'}`}
+            title="Surah Sebelumnya"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span className="hidden md:inline">Sebelumnya</span>
+          </button>
+        </div>
 
         <button
           onClick={() => setShowSurahModal(true)}
-          className={`flex-1 max-w-lg mx-auto flex items-center justify-between gap-2 px-2.5 rounded-lg sm:rounded-xl bg-emerald-50 hover:bg-emerald-100/90 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-100 transition-colors cursor-pointer group ${isLandscapeCompact ? 'py-1' : 'py-2'}`}
+          className={`flex-1 min-w-[140px] max-w-md mx-auto flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 rounded-lg sm:rounded-xl bg-emerald-50 hover:bg-emerald-100/90 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-100 transition-colors cursor-pointer group ${isLandscapeOrFocus ? 'py-1' : 'py-1.5 sm:py-2'}`}
           title="Klik untuk memilih langsung dari 114 surah tanpa scroll"
         >
-          <div className="flex items-center gap-2 truncate">
-            <span className={`rounded-md sm:rounded-lg bg-emerald-600 text-white font-extrabold flex items-center justify-center shrink-0 shadow-xs ${isLandscapeCompact ? 'w-5 h-5 text-[10px]' : 'w-7 h-7 text-xs'}`}>
+          <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+            <span className={`rounded-md sm:rounded-lg bg-emerald-600 text-white font-extrabold flex items-center justify-center shrink-0 shadow-xs ${isLandscapeOrFocus ? 'w-5 h-5 text-[10px]' : 'w-7 h-7 text-xs'}`}>
               {selectedSurah.number}
             </span>
             <div className="text-left truncate">
               <div className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
                 <span>Surah {selectedSurah.englishName}</span>
-                <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-normal hidden xs:inline">
+                <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-normal hidden sm:inline">
                   ({selectedSurah.englishNameTranslation})
                 </span>
               </div>
-              {!isLandscapeCompact && (
+              {!isLandscapeOrFocus && (
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                   {selectedSurah.numberOfAyahs} Ayat • {selectedSurah.revelationType === 'Meccan' ? 'Makkiyyah' : 'Madaniyyah'}
                 </div>
@@ -660,27 +1014,71 @@ export const QuranView: React.FC<QuranViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-850 px-2 py-0.5 rounded-md sm:rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-            <span>Ganti</span>
+          <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-850 px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            <span>Pilih</span>
             <ChevronDown className="w-3 h-3" />
           </div>
         </button>
 
-        <button
-          onClick={handleNextSurah}
-          disabled={selectedSurah.number >= 114}
-          className="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer shrink-0"
-          title="Surah Berikutnya"
-        >
-          <span className="hidden sm:inline">Berikutnya</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handleNextSurah}
+            disabled={selectedSurah.number >= 114}
+            className={`rounded-lg sm:rounded-xl text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer shrink-0 ${isLandscapeOrFocus ? 'px-2 py-1' : 'px-2.5 sm:px-3 py-2'}`}
+            title="Surah Berikutnya"
+          >
+            <span className="hidden md:inline">Berikutnya</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
+          {/* Quick Focus Mode Toggle (Hide menus for full reading space in landscape or portrait) */}
+          <button
+            onClick={toggleFocusMode}
+            className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              activeFocusMode
+                ? 'bg-amber-400 text-slate-950 shadow-xs ring-1 ring-amber-300'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+            }`}
+            title={activeFocusMode ? 'Matikan mode fokus (Tampilkan kembali menu)' : 'Aktifkan Mode Menyimak Penuh (Sembunyikan menu navigasi agar layar bersih)'}
+          >
+            {activeFocusMode ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            <span className="hidden xs:inline">{activeFocusMode ? 'Menu Tersembunyi' : 'Fokus'}</span>
+          </button>
+
+          {/* Quick Tajwid Toggle */}
+          <button
+            onClick={() => setEnableTajwid(!enableTajwid)}
+            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              enableTajwid
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+            }`}
+            title="Pewarnaan tajwid"
+          >
+            <Sparkles className="w-3 h-3 inline mr-0.5" />
+            <span className="hidden sm:inline">Tajwid</span>
+          </button>
+
+          {/* Quick Auto-Follow Toggle */}
+          <button
+            onClick={() => setAutoFollowAyah(!autoFollowAyah)}
+            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              autoFollowAyah
+                ? 'bg-amber-100 text-amber-950 border border-amber-300 dark:bg-amber-950/70 dark:text-amber-200'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+            }`}
+            title="Layar otomatis mengikuti kata yang dibaca"
+          >
+            <span className={`w-1.5 h-1.5 rounded-full inline-block mr-1 ${autoFollowAyah ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`}></span>
+            <span className="hidden sm:inline">Auto-Scroll</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Layout: Surah Selector List (Left 3 cols) & Verses Reading Area (Right 9 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Desktop Left Column: 114 Surahs Directory */}
-        <div className="hidden lg:block lg:col-span-4 sticky top-20 space-y-3">
+        <div className={`${isLandscapeOrFocus ? 'hidden' : 'hidden lg:block lg:col-span-4 sticky top-20 space-y-3'}`}>
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               Daftar 114 Surat:
@@ -763,20 +1161,20 @@ export const QuranView: React.FC<QuranViewProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Verses Reading Area (8 cols) */}
-        <div className={isLandscapeCompact ? 'col-span-12 space-y-2' : 'lg:col-span-8 space-y-4'}>
+        {/* Right Column: Verses Reading Area (12 cols in landscape/focus, 8 cols on desktop standard) */}
+        <div className={isLandscapeOrFocus ? 'col-span-12 space-y-2' : 'lg:col-span-8 space-y-4'}>
           {/* Bismillah Header (except for Surah At-Taubah #9) */}
           {selectedSurah.number !== 9 && (
-            <div className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center shadow-xs ${isLandscapeCompact ? 'rounded-xl p-2' : 'rounded-2xl p-6'}`}>
+            <div className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center shadow-xs ${isLandscapeOrFocus ? 'rounded-xl p-2' : 'rounded-2xl p-6'}`}>
               <p
                 dir="rtl"
                 className={`${
                   quranFontStyle === 'amiri' ? 'font-quran-amiri' : 'font-quran-indonesia'
-                } ${isLandscapeCompact ? 'text-xl sm:text-2xl leading-normal' : 'text-3xl sm:text-4xl leading-loose'} text-emerald-800 dark:text-emerald-300`}
+                } ${isLandscapeOrFocus ? 'text-xl sm:text-2xl leading-normal' : 'text-3xl sm:text-4xl leading-loose'} text-emerald-800 dark:text-emerald-300`}
               >
                 بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
               </p>
-              {!isLandscapeCompact && (
+              {!isLandscapeOrFocus && (
                 <p className="text-xs text-slate-500 italic mt-2">
                   Dengan nama Allah Yang Maha Pengasih lagi Maha Penyayang
                 </p>
@@ -803,11 +1201,11 @@ export const QuranView: React.FC<QuranViewProps> = ({
                     key={ayah.numberInSurah}
                     id={`ayah-${ayah.numberInSurah}`}
                     style={{
-                      scrollMarginTop: '90px',
-                      scrollMarginBottom: '110px',
+                      scrollMarginTop: isLandscapeOrFocus ? '45px' : '90px',
+                      scrollMarginBottom: isLandscapeOrFocus ? '55px' : '110px',
                     }}
                     className={`scroll-margin-ayah bg-white dark:bg-slate-800 border transition-all ${
-                      isLandscapeCompact ? 'rounded-xl p-2.5 sm:p-3.5 space-y-2' : 'rounded-2xl p-6 space-y-4'
+                      isLandscapeOrFocus ? 'rounded-xl p-2.5 sm:p-3.5 space-y-2' : 'rounded-2xl p-6 space-y-4'
                     } ${
                       isPlayingThis
                         ? 'border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/40 shadow-lg bg-gradient-to-b from-amber-50/25 via-emerald-50/15 to-transparent dark:from-amber-950/20 dark:via-emerald-950/10'
@@ -817,9 +1215,9 @@ export const QuranView: React.FC<QuranViewProps> = ({
                     }`}
                   >
                     {/* Top action bar: Ayah number, Audio button, Bookmark button */}
-                    <div className={`flex items-center justify-between border-b border-slate-100 dark:border-slate-750 ${isLandscapeCompact ? 'pb-1.5' : 'pb-3'}`}>
+                    <div className={`flex items-center justify-between border-b border-slate-100 dark:border-slate-750 ${isLandscapeOrFocus ? 'pb-1.5' : 'pb-3'}`}>
                       <div className="flex items-center gap-2">
-                        <span className={`rounded-lg font-bold flex items-center justify-center ${isLandscapeCompact ? 'w-6 h-6 text-[11px]' : 'w-7 h-7 text-xs'} ${
+                        <span className={`rounded-lg font-bold flex items-center justify-center ${isLandscapeOrFocus ? 'w-6 h-6 text-[11px]' : 'w-7 h-7 text-xs'} ${
                           isPlayingThis
                             ? 'bg-amber-500 text-white shadow-xs'
                             : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
@@ -832,7 +1230,7 @@ export const QuranView: React.FC<QuranViewProps> = ({
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
                             </span>
-                            <span>{isLandscapeCompact ? 'Highlight' : 'Highlight Audio Real-Time'}</span>
+                            <span>{isLandscapeOrFocus ? 'Highlight' : 'Highlight Audio Real-Time'}</span>
                           </span>
                         )}
                         {isBookmarked && !isPlayingThis && (
@@ -845,7 +1243,7 @@ export const QuranView: React.FC<QuranViewProps> = ({
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handlePlayAyahAudio(ayah.numberInSurah, ayah.audioUrl)}
-                          className={`rounded-lg border text-xs flex items-center gap-1 cursor-pointer transition-colors ${isLandscapeCompact ? 'p-1 px-2 text-[10px]' : 'p-1.5'} ${
+                          className={`rounded-lg border text-xs flex items-center gap-1 cursor-pointer transition-colors ${isLandscapeOrFocus ? 'p-1 px-2 text-[10px]' : 'p-1.5'} ${
                             isPlayingThis
                               ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                               : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
@@ -1022,17 +1420,81 @@ export const QuranView: React.FC<QuranViewProps> = ({
         </>
       )}
 
-      {/* Sticky Audio Listening Bar: Keeps highlight visible & provides immediate navigation in Portrait & Landscape */}
-      {isPlayingAudio && currentPlayingAyah && (
+      {/* Floating Audio Notice Toast (Shows non-blocking status e.g. automatic network recovery) */}
+      {audioNotice && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-full shadow-2xl border border-amber-300 animate-in fade-in flex items-center gap-2">
+          <Info className="w-4 h-4 shrink-0" />
+          <span>{audioNotice}</span>
+        </div>
+      )}
+
+      {/* Minimized Floating Audio Pill (Compact, neatly screen-bounded, never covers text) */}
+      {isPlayingAudio && currentPlayingAyah && isPlayerMinimized && (
+        <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-40 animate-in fade-in zoom-in-95 max-w-[calc(100vw-1rem)]">
+          <div className="bg-slate-900/95 dark:bg-slate-850/95 text-white backdrop-blur-md border border-amber-400/80 rounded-full px-2.5 py-1.5 shadow-2xl flex items-center gap-1.5 text-xs">
+            <button
+              onClick={() => {
+                const el =
+                  document.getElementById('active-quran-reading-word') ||
+                  document.getElementById(`ayah-${currentPlayingAyah}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+              className="flex items-center gap-1 font-bold cursor-pointer hover:text-amber-300 transition-colors shrink-0"
+              title="Arahkan ke ayat yang sedang dibaca"
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+              <span className="text-[11px] font-mono font-black">{selectedSurah.number}:{currentPlayingAyah}</span>
+            </button>
+
+            <button
+              onClick={() => handlePlayAyahAudio(currentPlayingAyah)}
+              className="p-1 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer transition-colors shrink-0"
+              title={isPlayingAudio ? 'Jeda Audio' : 'Lanjutkan Audio'}
+            >
+              {isPlayingAudio ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Quick Volume / Mute button */}
+            <button
+              onClick={() => setIsAudioMuted(!isAudioMuted)}
+              className="p-1 rounded-full hover:bg-white/20 text-slate-300 hover:text-white cursor-pointer transition-colors shrink-0"
+              title={isAudioMuted ? 'Audio bisu (Muted) - Ketuk untuk bunyikan' : `Volume: ${audioVolume}% (Ketuk untuk bisukan)`}
+            >
+              {isAudioMuted || audioVolume === 0 ? (
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5 text-amber-300" />
+              )}
+            </button>
+
+            {/* Expand button to restore full controls */}
+            <button
+              onClick={() => {
+                setIsPlayerMinimized(false);
+                resetPlayerAutoHideTimer();
+              }}
+              className="p-1 rounded-full hover:bg-white/20 text-slate-300 hover:text-white cursor-pointer transition-colors shrink-0"
+              title="Buka panel audio lengkap"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Audio Listening Bar: Perfectly sized, never overflows screen, with responsive layout */}
+      {isPlayingAudio && currentPlayingAyah && !isPlayerMinimized && (
         <aside
           aria-label="Panel Audio & Highlight Aktif"
-          className={`fixed left-2 right-2 max-w-xl mx-auto z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-amber-300 dark:border-amber-700/80 rounded-2xl shadow-xl transition-all animate-in slide-in-from-bottom-2 duration-200 ${
-            isLandscapeCompact
-              ? 'bottom-1 py-1 px-2.5 flex items-center justify-between gap-1.5 text-xs'
-              : 'bottom-14 sm:bottom-4 px-3 py-2 sm:py-2.5 flex items-center justify-between gap-2'
+          onMouseEnter={resetPlayerAutoHideTimer}
+          onTouchStart={resetPlayerAutoHideTimer}
+          className={`fixed left-2 right-2 max-w-lg mx-auto z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-amber-300 dark:border-amber-700/80 rounded-2xl shadow-xl transition-all animate-in slide-in-from-bottom-2 duration-200 box-border ${
+            isLandscapeOrFocus
+              ? 'bottom-1 py-1.5 px-2.5 flex items-center justify-between gap-1 text-xs'
+              : 'bottom-14 sm:bottom-4 px-2.5 py-2 sm:py-2.5 flex items-center justify-between gap-1.5'
           }`}
         >
-          {/* Left: Ayah info & center/scroll button */}
+          {/* Left: Ayah info & direct scroll */}
           <button
             onClick={() => {
               const el =
@@ -1042,33 +1504,34 @@ export const QuranView: React.FC<QuranViewProps> = ({
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }
             }}
-            className="flex items-center gap-2 text-left cursor-pointer group shrink-0"
-            title="Klik untuk langsung mengarahkan layar ke kata atau ayat yang sedang dilafalkan"
+            className="flex items-center gap-1.5 text-left cursor-pointer group shrink-0"
+            title="Klik untuk langsung mengarahkan layar ke ayat yang sedang dilafalkan"
           >
-            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-              {selectedSurah.number}:{currentPlayingAyah}
+            <div className="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] sm:text-xs flex items-center gap-1 shadow-xs group-hover:scale-105 transition-transform">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span>{selectedSurah.number}:{currentPlayingAyah}</span>
             </div>
-            <div className="hidden xs:block truncate max-w-[120px] sm:max-w-[200px]">
+            <div className="hidden md:block truncate max-w-[120px]">
               <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                QS. {selectedSurah.englishName} : {currentPlayingAyah}
+                QS. {selectedSurah.englishName}
               </p>
-              <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block"></span>
-                <span>Sorotan Berjalan (Klik Fokus)</span>
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+                Menyimak
               </p>
             </div>
           </button>
 
           {/* Center: Recitation Controls (Prev Ayah, Play/Pause, Next Ayah, Stop) */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             <button
               onClick={() => {
                 if (currentPlayingAyah > 1) {
-                  handlePlayAyahAudio(currentPlayingAyah - 1);
+                  const prevAyah = verses.find((v) => v.numberInSurah === currentPlayingAyah - 1);
+                  handlePlayAyahAudio(currentPlayingAyah - 1, prevAyah?.audioUrl);
                 }
               }}
               disabled={currentPlayingAyah <= 1}
-              className="p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
+              className="p-1 sm:p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
               title="Ayat Sebelumnya"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -1076,7 +1539,7 @@ export const QuranView: React.FC<QuranViewProps> = ({
 
             <button
               onClick={() => handlePlayAyahAudio(currentPlayingAyah)}
-              className="p-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-all active:scale-95"
+              className="p-1.5 sm:p-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-all active:scale-95"
               title={isPlayingAudio ? 'Jeda Audio' : 'Lanjutkan Audio'}
             >
               {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -1085,11 +1548,12 @@ export const QuranView: React.FC<QuranViewProps> = ({
             <button
               onClick={() => {
                 if (currentPlayingAyah < verses.length) {
-                  handlePlayAyahAudio(currentPlayingAyah + 1);
+                  const nextAyah = verses.find((v) => v.numberInSurah === currentPlayingAyah + 1);
+                  handlePlayAyahAudio(currentPlayingAyah + 1, nextAyah?.audioUrl);
                 }
               }}
               disabled={currentPlayingAyah >= verses.length}
-              className="p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
+              className="p-1 sm:p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
               title="Ayat Berikutnya"
             >
               <ChevronRight className="w-4 h-4" />
@@ -1097,36 +1561,138 @@ export const QuranView: React.FC<QuranViewProps> = ({
 
             <button
               onClick={stopAudio}
-              className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+              className="p-1 sm:p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
               title="Hentikan Audio"
             >
               <Square className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Right: Auto-follow toggle & Sync Offset calibrator */}
-          <div className="flex items-center gap-1 sm:gap-1.5">
+          {/* Right: Auto-follow, Volume with Auto-Hide popover, and Auto-Hide / Minimize button */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            {/* Auto-follow toggle */}
             <button
               onClick={() => setAutoFollowAyah(!autoFollowAyah)}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 cursor-pointer transition-colors ${
+              className={`p-1.5 sm:px-2 sm:py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 cursor-pointer transition-colors ${
                 autoFollowAyah
                   ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
               }`}
-              title={autoFollowAyah ? 'Auto-scroll aktif: Layar otomatis mengikuti kata yang dibaca' : 'Auto-scroll nonaktif'}
+              title={autoFollowAyah ? 'Auto-scroll aktif: Layar otomatis mengikuti ayat yang dilafalkan' : 'Auto-scroll nonaktif'}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${autoFollowAyah ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
-              <span className="hidden sm:inline">Ikuti:</span>
-              <span>{autoFollowAyah ? 'ON' : 'OFF'}</span>
+              <span className={`w-2 h-2 rounded-full ${autoFollowAyah ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
+              <span className="hidden sm:inline">Ikuti</span>
             </button>
 
+            {/* Volume Control Button with Auto-Hiding Slider Popover */}
+            <div ref={volumeContainerRef} className="relative flex items-center">
+              <button
+                onClick={handleToggleVolumeSlider}
+                className={`p-1.5 sm:p-1.5 rounded-lg border text-xs flex items-center justify-center cursor-pointer transition-colors ${
+                  showVolumeSlider
+                    ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                    : isAudioMuted || audioVolume === 0
+                    ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-800'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+                title={isAudioMuted ? 'Audio bisu (Muted) - Ketuk untuk bunyikan' : `Volume: ${audioVolume}% (Ketuk untuk atur / otomatis sembunyi)`}
+              >
+                {isAudioMuted || audioVolume === 0 ? (
+                  <VolumeX className="w-4 h-4" />
+                ) : audioVolume < 50 ? (
+                  <Volume1 className="w-4 h-4" />
+                ) : (
+                  <Volume2 className="w-4 h-4" />
+                )}
+              </button>
+
+              {/* Auto-Hiding Volume Slider Popover (Closes automatically after 3s of inactivity or click outside) */}
+              {showVolumeSlider && (
+                <div
+                  onMouseEnter={() => {
+                    if (volumeHideTimerRef.current) clearTimeout(volumeHideTimerRef.current);
+                  }}
+                  onMouseLeave={() => resetVolumeHideTimer()}
+                  className="absolute bottom-full mb-2 right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl border border-amber-300 dark:border-amber-700/80 shadow-2xl flex flex-col items-center gap-2.5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150 w-48 max-w-[calc(100vw-2rem)] box-border"
+                >
+                  <div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                    <span className="flex items-center gap-1.5">
+                      <Volume2 className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Volume Audio</span>
+                    </span>
+                    <span className="font-mono text-amber-600 dark:text-amber-400 font-black">
+                      {isAudioMuted ? 'MUTE' : `${audioVolume}%`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full">
+                    <button
+                      onClick={() => {
+                        setIsAudioMuted(!isAudioMuted);
+                        resetVolumeHideTimer();
+                      }}
+                      className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer shrink-0"
+                      title={isAudioMuted ? 'Bunyikan kembali' : 'Bisukan (Mute)'}
+                    >
+                      {isAudioMuted || audioVolume === 0 ? (
+                        <VolumeX className="w-4 h-4 text-rose-500" />
+                      ) : (
+                        <Volume2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      )}
+                    </button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={isAudioMuted ? 0 : audioVolume}
+                      onChange={(e) => handleVolumeChange(parseInt(e.target.value, 10))}
+                      className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                  </div>
+
+                  {/* Auto-Hide player toggle option */}
+                  <div className="w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px]">
+                    <span className="text-slate-500 dark:text-slate-400">Auto-hide bar:</span>
+                    <button
+                      onClick={toggleAutoHidePlayer}
+                      className={`px-1.5 py-0.5 rounded font-bold transition-colors cursor-pointer ${
+                        autoHidePlayer
+                          ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                      }`}
+                      title={autoHidePlayer ? 'Player otomatis mengecil saat membaca' : 'Player tetap tampil penuh'}
+                    >
+                      {autoHidePlayer ? 'AKTIF (5s)' : 'NONAKTIF'}
+                    </button>
+                  </div>
+
+                  <span className="text-[9px] text-slate-400 dark:text-slate-500 text-center italic">
+                    Otomatis hide setelah 3 detik
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Sync Offset calibrator button (compact) */}
             <button
               onClick={() => setShowSyncTuner(!showSyncTuner)}
-              className="px-2 py-1 rounded-lg text-[10px] font-semibold border bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-1"
-              title="Buka panel kalibrasi sinkronisasi audio (- / + ms)"
+              className="p-1.5 rounded-lg text-[10px] font-semibold border bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-0.5"
+              title="Kalibrasi sinkronisasi audio (- / + ms)"
             >
-              <SlidersHorizontal className="w-2.5 h-2.5" />
-              <span className="font-mono">{syncOffsetMs !== 0 ? `${syncOffsetMs > 0 ? '+' : ''}${syncOffsetMs}ms` : '0ms'}</span>
+              <SlidersHorizontal className="w-3 h-3" />
+              {syncOffsetMs !== 0 && (
+                <span className="font-mono text-[9px]">{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
+              )}
+            </button>
+
+            {/* Auto-Hide / Minimize Player button */}
+            <button
+              onClick={() => setIsPlayerMinimized(true)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              title="Ciutkan player (Auto-hide agar layar bersih)"
+            >
+              <ChevronDown className="w-4 h-4" />
             </button>
           </div>
         </aside>

@@ -154,6 +154,81 @@ export interface QuranMappingItem {
   };
 }
 
+export interface MedicalDiagramLabel {
+  id: string;
+  title: string;
+  desc: string;
+  x: number; // percentage (0-100)
+  y: number; // percentage (0-100)
+}
+
+export interface QuranMedicalEntry {
+  id: string;
+  title: string;
+  arabicTerm?: string;
+  latinScientificName?: string;
+  category:
+    | 'nutrisi-herbal'
+    | 'biomekanika-ibadah'
+    | 'kesehatan-mental'
+    | 'embriologi-anatomi'
+    | 'higienitas-pencegahan';
+  categoryLabel: string;
+  organSystems: ('jantung' | 'otak' | 'pencernaan' | 'imun' | 'tulang' | 'reproduksi' | 'kulit-mata')[];
+  summary: string;
+
+  // Al-Qur'an
+  quranVerse: {
+    surahNumber: number;
+    surahName: string;
+    ayahNumber: number | string;
+    arabicText: string;
+    transliteration: string;
+    translation: string;
+    tafsirBrief: string;
+  };
+
+  // Hadits Shahih
+  hadith: {
+    narrator: string;
+    arabicText?: string;
+    translation: string;
+    grade: 'Shahih' | 'Hasan';
+    context: string;
+  };
+
+  // Medis & Sains Modern
+  modernScience: {
+    keyCompounds: string[];
+    biochemicalMechanism: string;
+    clinicalBenefits: string[];
+    modernResearchStudies: {
+      journal: string;
+      finding: string;
+    }[];
+  };
+
+  // Panduan Praktis & Keamanan Medis
+  practicalGuide: {
+    recommendedUsage: string;
+    dosageOrMethod: string;
+    contraindicationsAndCautions: string[];
+    lifestyleTips: string[];
+  };
+
+  // Infografis Visual Diagram Medis
+  visualIllustration: {
+    type: 'anatomy-flow' | 'bio-diagram' | 'biochemical-cell' | 'posture-biomechanics';
+    caption: string;
+    accentColor: string;
+    diagramData: {
+      title: string;
+      subtitle: string;
+      labels: MedicalDiagramLabel[];
+    };
+  };
+}
+
 export type AppTab =
   | 'prayer-times'
   | 'qibla'
@@ -163,4 +238,6 @@ export type AppTab =
   | 'quran'
   | 'quran-mapping'
   | 'quran-memorize-shq'
+  | 'quran-medis'
   | 'khgt';
+

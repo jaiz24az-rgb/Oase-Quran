@@ -82,13 +82,14 @@ export default function App() {
   // Compact landscape detection (smartphones & small tablets rotated horizontally)
   const [isCompactLandscape, setIsCompactLandscape] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.matchMedia('(orientation: landscape) and (max-height: 560px)').matches;
+    return window.matchMedia('(orientation: landscape) and (max-height: 700px)').matches;
   });
   const [showMenusInLandscape, setShowMenusInLandscape] = useState<boolean>(false);
+  const [isQuranFocusMode, setIsQuranFocusMode] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const media = window.matchMedia('(orientation: landscape) and (max-height: 560px)');
+    const media = window.matchMedia('(orientation: landscape) and (max-height: 700px)');
     const check = () => {
       setIsCompactLandscape(media.matches);
       if (media.matches) {
@@ -104,8 +105,9 @@ export default function App() {
     };
   }, []);
 
-  // When in compact landscape, menus are auto-hidden by default to maximize reading viewport
-  const isLandscapeFullscreen = isCompactLandscape && !showMenusInLandscape;
+  // When in compact landscape or focus mode, menus are auto-hidden to maximize reading viewport
+  const isLandscapeFullscreen =
+    (isCompactLandscape && !showMenusInLandscape) || isQuranFocusMode;
 
   // Track triggered prayer times today to avoid repeat notifications within the same minute
   const triggeredTimesRef = useRef<Set<string>>(new Set());
@@ -223,22 +225,28 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100/70 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors selection:bg-emerald-500 selection:text-white">
-      {/* Floating Menu Toggle for Landscape Mode on Phones (Auto-hide for full Mushaf reading) */}
-      {isCompactLandscape && (
+      {/* Floating Menu Toggle for Landscape Mode on Phones & Focus Reading (Auto-hide for full Mushaf reading) */}
+      {(isCompactLandscape || isQuranFocusMode) && (
         <button
-          onClick={() => setShowMenusInLandscape(!showMenusInLandscape)}
+          onClick={() => {
+            if (isQuranFocusMode) {
+              setIsQuranFocusMode(false);
+            } else {
+              setShowMenusInLandscape(!showMenusInLandscape);
+            }
+          }}
           className="fixed top-2 right-2 z-50 bg-slate-900/85 hover:bg-slate-900 text-white dark:bg-slate-800/90 dark:hover:bg-slate-700 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-xl border border-white/20 transition-all cursor-pointer animate-in fade-in"
-          title={showMenusInLandscape ? 'Sembunyikan menu agar layar mushaf luas & penuh' : 'Tampilkan menu navigasi aplikasi'}
+          title={isLandscapeFullscreen ? 'Tampilkan menu navigasi aplikasi' : 'Sembunyikan menu agar layar mushaf luas & penuh'}
         >
-          {showMenusInLandscape ? (
+          {isLandscapeFullscreen ? (
             <>
-              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
-              <span>Sembunyikan Menu</span>
+              <Eye className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Tampilkan Menu</span>
             </>
           ) : (
             <>
-              <Eye className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Menu Layar</span>
+              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <span>Sembunyikan Menu</span>
             </>
           )}
         </button>
@@ -319,17 +327,29 @@ export default function App() {
           />
         )}
 
-        {(activeTab === 'quran' || activeTab === 'quran-mapping' || activeTab === 'quran-memorize-shq') && (
+        {(activeTab === 'quran' || activeTab === 'quran-mapping' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-medis') && (
           <QuranView
             initialSurahNumber={
               activeTab === 'quran-mapping' ? selectedSurahForMapping : selectedSurahForQuran
             }
             initialMode={
-              activeTab === 'quran-mapping' ? 'mapping' : activeTab === 'quran-memorize-shq' ? 'shq' : 'mushaf'
+              activeTab === 'quran-mapping'
+                ? 'mapping'
+                : activeTab === 'quran-memorize-shq'
+                ? 'shq'
+                : activeTab === 'quran-medis'
+                ? 'medis'
+                : 'mushaf'
             }
             onOpenQuranMapping={handleOpenQuranMapping}
             onOpenQuranMemorize={handleOpenQuranMemorize}
+            onOpenQuranMedis={() => {
+              setActiveTab('quran-medis');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             isLandscapeFullscreen={isLandscapeFullscreen}
+            isFocusMode={isQuranFocusMode}
+            onToggleFocusMode={() => setIsQuranFocusMode(!isQuranFocusMode)}
           />
         )}
 
@@ -380,7 +400,7 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-            activeTab === 'quran' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-mapping'
+            activeTab === 'quran' || activeTab === 'quran-memorize-shq' || activeTab === 'quran-mapping' || activeTab === 'quran-medis'
               ? 'text-emerald-600 dark:text-emerald-400 font-extrabold'
               : 'text-slate-500 dark:text-slate-400'
           }`}
@@ -457,7 +477,7 @@ export default function App() {
       />
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/80 backdrop-blur-md py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400 mt-12">
+      <footer className={`${isLandscapeFullscreen ? 'hidden' : 'block'} border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/80 backdrop-blur-md py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400 mt-12`}>
         <div className="max-w-7xl mx-auto space-y-2">
           <p className="font-semibold text-slate-700 dark:text-slate-300">
             Oase-Muslim: Aplikasi Muslim Terpadu

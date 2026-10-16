@@ -181,17 +181,45 @@ export const LOCAL_SURAHS_MAP: Record<number, QuranAyah[]> = {
   ],
 };
 
+// In-memory cache for fast instant retrieval and preventing repeated large downloads
+const surahVersesMemoryCache = new Map<number, QuranAyah[]>();
+
 /**
- * Fetch verses dynamically from standard Indonesian API with local fallback
+ * Fetch verses dynamically from standard Indonesian API with local fallback & caching
  */
 export async function fetchSurahVerses(surahNumber: number): Promise<QuranAyah[]> {
-  // If locally cached complete surah exists, check if user requests another
+  // 1. Check in-memory cache first
+  if (surahVersesMemoryCache.has(surahNumber)) {
+    return surahVersesMemoryCache.get(surahNumber)!;
+  }
+
+  // 2. Check localStorage cache for instant offline & high-speed access
   try {
-    const res = await fetch(`https://equran.id/api/v2/surat/${surahNumber}`);
+    const cached = localStorage.getItem(`tarjih_quran_surah_${surahNumber}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        surahVersesMemoryCache.set(surahNumber, parsed);
+        return parsed;
+      }
+    }
+  } catch {
+    // localStorage might be unavailable or disabled
+  }
+
+  // 3. Fetch from primary Indonesian API (equran.id) with 8-second timeout
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`https://equran.id/api/v2/surat/${surahNumber}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
     if (res.ok) {
       const data = await res.json();
-      if (data && data.data && Array.isArray(data.data.ayat)) {
-        return data.data.ayat.map((item: { nomorAyat: number; teksArab: string; teksIndonesia: string; teksLatin: string; audio: Record<string, string> }) => ({
+      if (data && data.data && Array.isArray(data.data.ayat) && data.data.ayat.length > 0) {
+        const result: QuranAyah[] = data.data.ayat.map((item: { nomorAyat: number; teksArab: string; teksIndonesia: string; teksLatin: string; audio: Record<string, string> }) => ({
           number: item.nomorAyat,
           numberInSurah: item.nomorAyat,
           text: item.teksArab,
@@ -199,34 +227,57 @@ export async function fetchSurahVerses(surahNumber: number): Promise<QuranAyah[]
           transliteration: item.teksLatin,
           audioUrl: item.audio ? (item.audio['05'] || item.audio['01'] || Object.values(item.audio)[0]) : undefined,
         }));
+
+        // Cache in memory and localStorage
+        surahVersesMemoryCache.set(surahNumber, result);
+        try {
+          localStorage.setItem(`tarjih_quran_surah_${surahNumber}`, JSON.stringify(result));
+        } catch {
+          // ignore quota limits
+        }
+        return result;
       }
     }
   } catch (err) {
     console.warn(`Dynamic API fetch failed for Surah ${surahNumber}, trying secondary source...`, err);
   }
 
-  // Secondary standard fallback: Al-Quran Cloud API (Uthmani + Indonesian translation)
+  // 4. Secondary standard fallback: Al-Quran Cloud API (Uthmani + Indonesian translation)
   try {
-    const res2 = await fetch(`https://api.alquran.cloud/v1/surah/${surahNumber}/editions/quran-uthmani,id.indonesian`);
+    const controller2 = new AbortController();
+    const timeoutId2 = setTimeout(() => controller2.abort(), 8000);
+    const res2 = await fetch(`https://api.alquran.cloud/v1/surah/${surahNumber}/editions/quran-uthmani,id.indonesian`, {
+      signal: controller2.signal,
+    });
+    clearTimeout(timeoutId2);
+
     if (res2.ok) {
       const json2 = await res2.json();
       if (json2 && json2.data && json2.data.length >= 2) {
         const arabicData = json2.data[0].ayahs;
         const indoData = json2.data[1].ayahs;
-        return arabicData.map((ay: { numberInSurah: number; text: string }, idx: number) => ({
+        const result: QuranAyah[] = arabicData.map((ay: { numberInSurah: number; text: string; number: number }, idx: number) => ({
           number: ay.numberInSurah,
           numberInSurah: ay.numberInSurah,
           text: ay.text,
           translation: indoData[idx] ? indoData[idx].text : '',
-          audioUrl: `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${ay.numberInSurah}.mp3`,
+          audioUrl: `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${ay.number}.mp3`,
         }));
+
+        surahVersesMemoryCache.set(surahNumber, result);
+        try {
+          localStorage.setItem(`tarjih_quran_surah_${surahNumber}`, JSON.stringify(result));
+        } catch {
+          // ignore
+        }
+        return result;
       }
     }
   } catch (err2) {
     console.warn(`Secondary API fallback failed for Surah ${surahNumber}`, err2);
   }
 
-  // If both networks fail or offline, return local bundle if available
+  // 5. If both networks fail or offline, return local bundle if available
   if (LOCAL_SURAHS_MAP[surahNumber]) {
     return LOCAL_SURAHS_MAP[surahNumber];
   }
