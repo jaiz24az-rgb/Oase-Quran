@@ -19,9 +19,19 @@ import {
   Brain,
   BookOpen,
   ArrowRight,
+  Plus,
+  Scale,
+  HelpCircle,
+  Layers,
 } from 'lucide-react';
 import { LocationConfig, PrayerTimeData, TarjihSettings } from '../types';
-import { NextPrayerInfo, calculateTarjihPrayerTimes, calculateQibla } from '../utils/prayerTimesTarjih';
+import {
+  NextPrayerInfo,
+  calculateTarjihPrayerTimes,
+  calculateDepagPrayerTimes,
+  comparePrayerTimes,
+  calculateQibla,
+} from '../utils/prayerTimesTarjih';
 import { audioReminder } from '../utils/audioAlerts';
 import { ExportPdfModal } from './ExportPdfModal';
 import { QiblaCompassView } from './QiblaCompassView';
@@ -62,6 +72,19 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
   const [selectedMonthOffset, setSelectedMonthOffset] = useState(0);
   const [isExportPdfOpen, setIsExportPdfOpen] = useState(false);
   const [showEmbeddedQibla, setShowEmbeddedQibla] = useState<boolean>(initialShowQibla);
+  const [showDepagComparison, setShowDepagComparison] = useState(true);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [showDepagInMonthly, setShowDepagInMonthly] = useState(true);
+
+  // Compute today's Depag (Kemenag RI) prayer times
+  const depagTimes = useMemo(() => {
+    return calculateDepagPrayerTimes(new Date(), location, settings.ihtiyatMinutes);
+  }, [location, settings.ihtiyatMinutes]);
+
+  // Comparison details
+  const comparison = useMemo(() => {
+    return comparePrayerTimes(prayerTimes, depagTimes);
+  }, [prayerTimes, depagTimes]);
 
   const qiblaInfo = useMemo(
     () => calculateQibla(location.latitude, location.longitude),
@@ -137,11 +160,13 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
     for (let i = 1; i <= totalDays; i++) {
       const d = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), i);
       const times = calculateTarjihPrayerTimes(d, location, settings);
+      const depag = calculateDepagPrayerTimes(d, location, settings.ihtiyatMinutes);
       days.push({
         date: d,
         dayNum: i,
         dayName: d.toLocaleDateString('id-ID', { weekday: 'short' }),
         times,
+        depag,
       });
     }
     return days;
@@ -214,7 +239,16 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
                 <span className="text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-wide">
                   {nextPrayer.formattedCountdown}
                 </span>
-                <span className="text-xs text-emerald-300 mt-0.5">Pukul {nextPrayer.time} WIB/WITA/WIT</span>
+                <div className="flex items-center gap-2 mt-1 flex-wrap justify-end">
+                  <span className="text-xs text-emerald-200 font-medium">Tarjih: {nextPrayer.time}</span>
+                  <span className="text-white/40">•</span>
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-300 font-semibold bg-white/10 px-2 py-0.5 rounded-md border border-white/15">
+                    <span className="font-black text-amber-400 text-sm leading-none">+</span> Depag: {depagTimes[nextPrayer.key]}
+                    {comparison[nextPrayer.key].diffMinutes !== 0 && (
+                      <span className="text-[10px] text-amber-200 opacity-90">({comparison[nextPrayer.key].diffBadge})</span>
+                    )}
+                  </span>
+                </div>
               </div>
             )}
 
@@ -346,16 +380,29 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
         )}
       </div>
 
-      {/* Tarjih Subuh -18° Special Notice */}
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm">
-        <Info className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <p className="font-semibold text-emerald-800 dark:text-emerald-300">
-            Metode Hisab Hakiki Kontemporer & Kalender Hijriah Global Tunggal (KHGT)
-          </p>
-          <p className="text-emerald-700/90 dark:text-emerald-300/80 leading-relaxed">
-            Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, jadwal ini disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah, yang mendukung penyatuan waktu ibadah umat Islam secara global. Penetapan awal waktu Subuh menggunakan posisi matahari -18° di bawah ufuk untuk memastikan keabsahan waktu fajar shadiq.
-          </p>
+      {/* Tarjih Subuh -18° Special Notice & Depag Comparison Info */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+              Metode Hisab Hakiki Kontemporer (Subuh -18°) & Komparasi Kemenag / Depag RI (Subuh -20°)
+            </p>
+            <p className="text-emerald-700/90 dark:text-emerald-300/80 leading-relaxed text-xs">
+              Jadwal utama menggunakan hisab hakiki kontemporer (Tarjih Muhammadiyah/KHGT) dengan posisi matahari Subuh -18°. Tanda <strong className="text-emerald-800 dark:text-emerald-200 font-bold">+ Depag</strong> menampilkan waktu Kementerian Agama RI (-20°) untuk perbandingan langsung yang akurat.
+            </p>
+          </div>
+        </div>
+
+        <div className="shrink-0 flex items-center gap-2 self-stretch sm:self-auto justify-end">
+          <button
+            onClick={() => setShowComparisonModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+            title="Buka tabel dan analisis perbandingan Tarjih vs Depag"
+          >
+            <Scale className="w-3.5 h-3.5 text-amber-300" />
+            <span>Detail Komparasi</span>
+          </button>
         </div>
       </div>
 
@@ -364,12 +411,14 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
         {prayerItems.map((item) => {
           const isNext = nextPrayer?.key === item.key;
           const timeValue = prayerTimes[item.key];
+          const depagValue = depagTimes[item.key];
+          const comp = comparison[item.key];
 
           return (
             <div
               key={item.key}
               id={`prayer-card-${item.key}`}
-              className={`relative flex flex-col justify-between p-4 rounded-xl border transition-all ${
+              className={`relative flex flex-col justify-between p-3.5 sm:p-4 rounded-xl border transition-all ${
                 isNext
                   ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 dark:border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
                   : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700/80 hover:border-emerald-300'
@@ -383,7 +432,7 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
 
               <div>
                 <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-semibold">{item.label}</span>
                   <span className="font-arabic text-sm text-slate-400 dark:text-slate-500">{item.arabic}</span>
                 </div>
 
@@ -398,6 +447,28 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
                     {timeValue}
                   </span>
                 </div>
+
+                {/* + Depag Comparison Badge */}
+                {showDepagComparison && (
+                  <div className="mb-2 py-1 px-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200/90 dark:border-amber-800/80 flex items-center justify-between gap-1 text-[11px] shadow-2xs">
+                    <span className="inline-flex items-center gap-1 font-bold text-amber-900 dark:text-amber-200">
+                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 leading-none">+</span>
+                      <span>Depag: {depagValue}</span>
+                    </span>
+                    {comp.diffMinutes !== 0 ? (
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 dark:bg-amber-900 dark:text-amber-200"
+                        title={`Selisih dengan Tarjih: ${comp.diffBadge}`}
+                      >
+                        {comp.diffBadge}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">
+                        Sama
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60">
@@ -410,7 +481,7 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
         })}
       </div>
 
-      {/* Control Toolbar: View Monthly / Switch Location / Settings */}
+      {/* Control Toolbar: View Monthly / Switch Location / Settings / Depag Toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-emerald-600" />
@@ -425,7 +496,31 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            id="btn-toggle-depag-badge"
+            onClick={() => setShowDepagComparison(!showDepagComparison)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              showDepagComparison
+                ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
+            }`}
+            title="Tampilkan tanda + waktu sholat menurut Depag untuk perbandingan"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+            <span>{showDepagComparison ? '+ Depag Aktif' : '+ Bandingkan Depag'}</span>
+          </button>
+
+          <button
+            id="btn-open-depag-modal"
+            onClick={() => setShowComparisonModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 dark:hover:bg-teal-900 text-teal-800 dark:text-teal-200 text-xs sm:text-sm font-semibold border border-teal-200 dark:border-teal-800 transition-colors cursor-pointer"
+            title="Buka tabel lengkap komparasi hisab Tarjih vs Depag"
+          >
+            <Scale className="w-3.5 h-3.5" />
+            <span>Tabel Komparasi</span>
+          </button>
+
           <button
             id="btn-toolbar-export-pdf"
             onClick={() => setIsExportPdfOpen(true)}
@@ -455,16 +550,33 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
         </div>
       </div>
 
-      {/* Monthly Prayer Table View */}
+      {/* Monthly Prayer Table View with + Depag Column Toggle */}
       {showMonthlyView && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 space-y-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-emerald-600" />
-              <span>Jadwal Waktu Sholat Bulanan - {location.name}</span>
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-emerald-600" />
+                <span>Jadwal Waktu Sholat Bulanan - {location.name}</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Perbandingan hisab hakiki Tarjih (-18°) dan Kemenag / Depag RI (-20°)
+              </p>
+            </div>
 
             <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
+              <button
+                onClick={() => setShowDepagInMonthly(!showDepagInMonthly)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded cursor-pointer font-bold transition-colors ${
+                  showDepagInMonthly
+                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800'
+                    : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600'
+                }`}
+                title="Tampilkan / sembunyikan waktu Depag di tabel bulanan"
+              >
+                <Plus className="w-3 h-3 stroke-[3]" />
+                <span>{showDepagInMonthly ? '+ Depag Ditampilkan' : '+ Tampilkan Depag'}</span>
+              </button>
               <button
                 onClick={() => setSelectedMonthOffset((prev) => prev - 1)}
                 className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 cursor-pointer font-medium"
@@ -501,8 +613,14 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
                 <tr className="bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <th className="py-2.5 px-3">Tgl</th>
                   <th className="py-2.5 px-3">Hari</th>
-                  <th className="py-2.5 px-3">Imsak</th>
-                  <th className="py-2.5 px-3 text-emerald-700 dark:text-emerald-400 font-bold">Subuh (-18°)</th>
+                  <th className="py-2.5 px-3">
+                    <div>Imsak</div>
+                    {showDepagInMonthly && <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400">+ Depag</div>}
+                  </th>
+                  <th className="py-2.5 px-3 text-emerald-700 dark:text-emerald-400 font-bold">
+                    <div>Subuh (-18°)</div>
+                    {showDepagInMonthly && <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400">+ Depag (-20°)</div>}
+                  </th>
                   <th className="py-2.5 px-3">Terbit</th>
                   <th className="py-2.5 px-3">Dhuha</th>
                   <th className="py-2.5 px-3">Dzuhur</th>
@@ -527,11 +645,23 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
                           : 'hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300'
                       }
                     >
-                      <td className="py-2 px-3">{day.dayNum}</td>
+                      <td className="py-2 px-3 font-semibold">{day.dayNum}</td>
                       <td className="py-2 px-3">{day.dayName}</td>
-                      <td className="py-2 px-3">{day.times.imsak}</td>
+                      <td className="py-2 px-3">
+                        <div>{day.times.imsak}</div>
+                        {showDepagInMonthly && (
+                          <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                            + {day.depag.imsak}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-2 px-3 font-semibold text-emerald-700 dark:text-emerald-400">
-                        {day.times.subuh}
+                        <div>{day.times.subuh}</div>
+                        {showDepagInMonthly && (
+                          <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                            + {day.depag.subuh}
+                          </div>
+                        )}
                       </td>
                       <td className="py-2 px-3">{day.times.terbit}</td>
                       <td className="py-2 px-3">{day.times.dhuha}</td>
@@ -544,6 +674,114 @@ export const PrayerTimesView: React.FC<PrayerTimesViewProps> = ({
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Depag Comparison Detail Modal */}
+      {showComparisonModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-950 flex items-center justify-center text-amber-700 dark:text-amber-300 font-bold">
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <span>Komparasi Waktu Sholat: Tarjih vs Depag RI</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Wilayah {location.name} (Hisab Hakiki -18° vs Standar Kemenag -20°)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowComparisonModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Explanation highlight */}
+            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
+                <Info className="w-4 h-4 shrink-0" />
+                <span>Mengapa Muncul Selisih Waktu Subuh & Imsak?</span>
+              </div>
+              <p className="leading-relaxed">
+                Kementerian Agama RI (Depag) menetapkan kriteria ketinggian matahari awal Subuh pada sudut <strong>-20.0°</strong> di bawah ufuk. Sementara itu, Majelis Tarjih dan Tajdid PP Muhammadiyah (Keputusan Munas Tarjih ke-31 tahun 2020) mengoreksi sudut fajar shadiq menjadi <strong>-18.0°</strong> berdasarkan observasi empiris astronomis global (Islamic Science Research Network & Kalender Hijriah Global Tunggal). Hal ini menyebabkan awal waktu Subuh versi Tarjih masuk sekitar <strong>8 menit lebih lambat</strong> dibanding versi Depag, dan waktu Imsak (10 menit sebelum Subuh) menyesuaikan.
+              </p>
+            </div>
+
+            {/* Comparison Table */}
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+              <table className="w-full text-left text-xs sm:text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 font-bold border-b border-slate-200 dark:border-slate-700">
+                    <th className="py-2.5 px-3">Waktu</th>
+                    <th className="py-2.5 px-3 text-emerald-700 dark:text-emerald-400">Tarjih (-18°)</th>
+                    <th className="py-2.5 px-3 text-amber-700 dark:text-amber-400">+ Depag RI</th>
+                    <th className="py-2.5 px-3 text-center">Selisih</th>
+                    <th className="py-2.5 px-3">Keterangan Parameter</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                  {prayerItems.map((item) => {
+                    const comp = comparison[item.key];
+                    const isDiff = comp.diffMinutes !== 0;
+
+                    return (
+                      <tr
+                        key={item.key}
+                        className={
+                          isDiff
+                            ? 'bg-amber-50/50 dark:bg-amber-950/20 text-slate-800 dark:text-slate-200'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300'
+                        }
+                      >
+                        <td className="py-2.5 px-3 font-semibold">
+                          <div className="flex items-center gap-1.5">
+                            <span>{item.label}</span>
+                            <span className="text-[11px] text-slate-400 font-arabic">{item.arabic}</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                          {comp.tarjihTime}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-amber-700 dark:text-amber-400">
+                          {comp.depagTime}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          {isDiff ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 font-bold text-xs">
+                              {comp.diffBadge}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">Sama</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-xs text-slate-500 dark:text-slate-400">
+                          {comp.explanation}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Close button */}
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setShowComparisonModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-black dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold text-xs transition-colors cursor-pointer"
+              >
+                Tutup Komparasi
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { LocationConfig, TarjihSettings } from '../types';
-import { calculateTarjihPrayerTimes, calculateQibla } from './prayerTimesTarjih';
+import { calculateTarjihPrayerTimes, calculateDepagPrayerTimes, calculateQibla } from './prayerTimesTarjih';
 import { getKhgtHijriDate } from './khgtCalendar';
 
 export interface PdfExportOptions {
@@ -12,6 +12,7 @@ export interface PdfExportOptions {
   orientation?: 'portrait' | 'landscape';
   includeSunnahTimes?: boolean; // Terbit & Dhuha
   includeKhgtHijri?: boolean;
+  includeDepagComparison?: boolean; // Waktu Depag untuk perbandingan
   paperSize?: 'a4';
 }
 
@@ -67,6 +68,7 @@ export function generateTarjihSchedulePdf(options: PdfExportOptions): jsPDF {
     orientation = 'portrait',
     includeSunnahTimes = true,
     includeKhgtHijri = true,
+    includeDepagComparison = true,
   } = options;
 
   const doc = new jsPDF({
@@ -186,7 +188,14 @@ export function generateTarjihSchedulePdf(options: PdfExportOptions): jsPDF {
   if (includeKhgtHijri) {
     headers.push('KHGT (Hijriah)');
   }
-  headers.push('Imsak', 'Subuh (-18°)*');
+  headers.push('Imsak');
+  if (includeDepagComparison) {
+    headers.push('+ Depag');
+  }
+  headers.push('Subuh (-18°)*');
+  if (includeDepagComparison) {
+    headers.push('+ Depag (-20°)');
+  }
   if (includeSunnahTimes) {
     headers.push('Terbit', 'Dhuha');
   }
@@ -195,6 +204,7 @@ export function generateTarjihSchedulePdf(options: PdfExportOptions): jsPDF {
   for (let d = 1; d <= totalDays; d++) {
     const curDate = new Date(year, month, d);
     const times = calculateTarjihPrayerTimes(curDate, location, settings);
+    const depag = calculateDepagPrayerTimes(curDate, location, settings.ihtiyatMinutes);
     const hijri = getKhgtHijriDate(curDate);
     const dayName = curDate.toLocaleDateString('id-ID', { weekday: 'short' });
 
@@ -203,7 +213,13 @@ export function generateTarjihSchedulePdf(options: PdfExportOptions): jsPDF {
       row.push(`${hijri.day} ${hijri.monthName.substring(0, 6)}`);
     }
     row.push(times.imsak);
+    if (includeDepagComparison) {
+      row.push(depag.imsak);
+    }
     row.push(times.subuh);
+    if (includeDepagComparison) {
+      row.push(depag.subuh);
+    }
     if (includeSunnahTimes) {
       row.push(times.terbit);
       row.push(times.dhuha);
@@ -300,7 +316,9 @@ export function generateTarjihSchedulePdf(options: PdfExportOptions): jsPDF {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
   doc.text(
-    '1. Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah.',
+    includeDepagComparison
+      ? '1. Dihitung berdasarkan metode hisab hakiki kontemporer (Tarjih Subuh -18°). Kolom "+ Depag" menampilkan waktu Kementerian Agama RI (-20°) untuk perbandingan.'
+      : '1. Dihitung berdasarkan metode hisab hakiki kontemporer yang konsisten digunakan Muhammadiyah, disesuaikan dengan Kalender Hijriah Global Tunggal Muhammadiyah.',
     margin + 3,
     footerBoxY + 7
   );

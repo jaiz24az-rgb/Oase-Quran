@@ -20,7 +20,7 @@ import {
   generateTarjihSchedulePdf,
   downloadTarjihSchedulePdf,
 } from '../utils/pdfScheduleGenerator';
-import { calculateTarjihPrayerTimes, calculateQibla } from '../utils/prayerTimesTarjih';
+import { calculateTarjihPrayerTimes, calculateDepagPrayerTimes, calculateQibla } from '../utils/prayerTimesTarjih';
 import { getKhgtHijriDate } from '../utils/khgtCalendar';
 import { OaseEmblem } from './OaseLogo';
 
@@ -60,6 +60,7 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [includeSunnahTimes, setIncludeSunnahTimes] = useState<boolean>(true);
   const [includeKhgtHijri, setIncludeKhgtHijri] = useState<boolean>(true);
+  const [includeDepagComparison, setIncludeDepagComparison] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -73,6 +74,7 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
     for (let d = 1; d <= daysInMonth; d++) {
       const curDate = new Date(selectedYear, selectedMonth, d);
       const times = calculateTarjihPrayerTimes(curDate, location, settings);
+      const depag = calculateDepagPrayerTimes(curDate, location, settings.ihtiyatMinutes);
       const hijri = getKhgtHijriDate(curDate);
       const dayName = curDate.toLocaleDateString('id-ID', { weekday: 'short' });
       list.push({
@@ -80,6 +82,7 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
         dayName,
         hijriFormatted: `${hijri.day} ${hijri.monthName.substring(0, 7)}`,
         times,
+        depag,
       });
     }
     return list;
@@ -105,6 +108,7 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
           orientation,
           includeSunnahTimes,
           includeKhgtHijri,
+          includeDepagComparison,
         });
 
         setIsGenerating(false);
@@ -311,6 +315,18 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
                   />
                   <span>Sertakan Tanggal Hijriah (KHGT)</span>
                 </label>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={includeDepagComparison}
+                    onChange={(e) => setIncludeDepagComparison(e.target.checked)}
+                    className="rounded-sm text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                  />
+                  <span className="font-semibold text-amber-700 dark:text-amber-400">
+                    Sertakan + Waktu Depag (-20°) untuk Komparasi
+                  </span>
+                </label>
               </div>
             </div>
 
@@ -432,7 +448,13 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
                       <th className="py-1.5 px-2">Hari</th>
                       {includeKhgtHijri && <th className="py-1.5 px-2">KHGT</th>}
                       <th className="py-1.5 px-2">Imsak</th>
+                      {includeDepagComparison && (
+                        <th className="py-1.5 px-2 text-amber-300 font-bold">+ Depag</th>
+                      )}
                       <th className="py-1.5 px-2 bg-emerald-900 text-amber-200">Subuh (-18°)</th>
+                      {includeDepagComparison && (
+                        <th className="py-1.5 px-2 text-amber-300 font-bold">+ Depag (-20°)</th>
+                      )}
                       {includeSunnahTimes && (
                         <>
                           <th className="py-1.5 px-2">Terbit</th>
@@ -477,9 +499,19 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
                             </td>
                           )}
                           <td className="py-1 px-2">{item.times.imsak}</td>
+                          {includeDepagComparison && (
+                            <td className="py-1 px-2 text-amber-600 dark:text-amber-400 font-bold">
+                              {item.depag.imsak}
+                            </td>
+                          )}
                           <td className="py-1 px-2 font-bold text-emerald-700 dark:text-emerald-400">
                             {item.times.subuh}
                           </td>
+                          {includeDepagComparison && (
+                            <td className="py-1 px-2 text-amber-600 dark:text-amber-400 font-bold">
+                              {item.depag.subuh}
+                            </td>
+                          )}
                           {includeSunnahTimes && (
                             <>
                               <td className="py-1 px-2 text-slate-500">{item.times.terbit}</td>

@@ -101,10 +101,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs space-y-1">
           <div className="flex items-center gap-1.5 font-bold text-emerald-800 dark:text-emerald-300">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Ketetapan Hisab Astronomis Ilmiah</span>
+            <span>Ketetapan Hisab Astronomis Ilmiah (Tarjih -18° vs Depag -20°)</span>
           </div>
           <p className="text-emerald-900/80 dark:text-emerald-300/80 leading-relaxed">
-            Parameter awal Subuh terkunci pada sudut matahari <strong>-18.0°</strong> dan Isya pada <strong>-18.0°</strong> sesuai hisab ilmiah astronomis kontemporer.
+            Parameter awal Subuh Tarjih terkunci pada sudut matahari <strong>-18.0°</strong> dan Isya pada <strong>-18.0°</strong>. Anda dapat melihat perbandingan langsung dengan waktu sholat resmi Depag/Kemenag RI (-20°) melalui tanda <strong>+ Depag</strong> di layar utama.
           </p>
         </div>
 

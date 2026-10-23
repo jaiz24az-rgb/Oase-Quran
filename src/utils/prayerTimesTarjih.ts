@@ -199,6 +199,169 @@ export function calculateTarjihPrayerTimes(
 }
 
 /**
+ * Calculates prayer times strictly following Kementerian Agama RI (Depag / Kemenag):
+ * - Subuh: Sun depression angle = 20.0°
+ * - Isya: Sun depression angle = 18.0°
+ * - Ashar: Shafi'i shadow factor = 1
+ * - Maghrib: Sun center -1.0° below horizon + Ihtiyat
+ * - Dzuhur: Solar transit (zawal) + Ihtiyat
+ * - Terbit: -1.0°
+ * - Dhuha: Sun elevation = 4.5°
+ * - Imsak: Subuh - 10 minutes
+ */
+export function calculateDepagPrayerTimes(
+  date: Date,
+  location: LocationConfig,
+  ihtiyatMinutes: number = 2
+): PrayerTimeData {
+  const JD = getJulianDate(date);
+  const { declination, equationOfTime } = getSunPosition(JD);
+
+  const lat = location.latitude;
+  const lng = location.longitude;
+  const tz = location.timezone;
+
+  // Midday / Solar Noon in local standard time
+  const noon = fixHour(12 + tz - lng / 15.0 - equationOfTime);
+
+  const timeAngle = (angle: number, isMorning: boolean): number => {
+    const cosHA =
+      (-Math.sin(toRad(angle)) - Math.sin(toRad(lat)) * Math.sin(toRad(declination))) /
+      (Math.cos(toRad(lat)) * Math.cos(toRad(declination)));
+
+    if (cosHA < -1.0 || cosHA > 1.0) {
+      return noon;
+    }
+
+    const hourAngle = toDeg(Math.acos(cosHA)) / 15.0;
+    return isMorning ? noon - hourAngle : noon + hourAngle;
+  };
+
+  const asrAngle = (): number => {
+    const t = Math.abs(lat - declination);
+    const cotAngle = 1.0 + Math.tan(toRad(t));
+    const altAngle = toDeg(Math.atan(1 / cotAngle));
+
+    const cosHA =
+      (Math.sin(toRad(altAngle)) - Math.sin(toRad(lat)) * Math.sin(toRad(declination))) /
+      (Math.cos(toRad(lat)) * Math.cos(toRad(declination)));
+
+    if (cosHA < -1.0 || cosHA > 1.0) return noon + 3;
+    const hourAngle = toDeg(Math.acos(cosHA)) / 15.0;
+    return noon + hourAngle;
+  };
+
+  const ihtiyatHours = ihtiyatMinutes / 60.0;
+
+  // Depag Subuh: 20.0° depression angle
+  const subuhRaw = timeAngle(20.0, true) + ihtiyatHours;
+  // Depag Terbit: 1.0° depression
+  const terbitRaw = timeAngle(1.0, true);
+  // Depag Dhuha: 4.5° elevation
+  const dhuhaRaw = timeAngle(-4.5, true) + ihtiyatHours;
+  // Depag Dzuhur: Zawal + ihtiyat
+  const dzuhurRaw = noon + ihtiyatHours;
+  // Depag Ashar: Shafi'i shadow + ihtiyat
+  const asharRaw = asrAngle() + ihtiyatHours;
+  // Depag Maghrib: sunset 1.0° + ihtiyat
+  const maghribRaw = timeAngle(1.0, false) + ihtiyatHours;
+  // Depag Isya: 18.0° depression + ihtiyat
+  const isyaRaw = timeAngle(18.0, false) + ihtiyatHours;
+  // Depag Imsak: 10 minutes before Depag Subuh
+  const imsakRaw = subuhRaw - 10 / 60.0;
+
+  return {
+    imsak: formatHourMinute(imsakRaw),
+    subuh: formatHourMinute(subuhRaw),
+    terbit: formatHourMinute(terbitRaw),
+    dhuha: formatHourMinute(dhuhaRaw),
+    dzuhur: formatHourMinute(dzuhurRaw),
+    ashar: formatHourMinute(asharRaw),
+    maghrib: formatHourMinute(maghribRaw),
+    isya: formatHourMinute(isyaRaw),
+  };
+}
+
+export interface PrayerComparisonDetail {
+  key: keyof PrayerTimeData;
+  label: string;
+  tarjihTime: string;
+  depagTime: string;
+  diffMinutes: number; // Positive means Tarjih is later than Depag
+  diffBadge: string;
+  depagDisplay: string;
+  explanation: string;
+}
+
+export function comparePrayerTimes(
+  tarjihTimes: PrayerTimeData,
+  depagTimes: PrayerTimeData
+): Record<keyof PrayerTimeData, PrayerComparisonDetail> {
+  const keys: (keyof PrayerTimeData)[] = [
+    'imsak',
+    'subuh',
+    'terbit',
+    'dhuha',
+    'dzuhur',
+    'ashar',
+    'maghrib',
+    'isya',
+  ];
+
+  const labels: Record<keyof PrayerTimeData, string> = {
+    imsak: 'Imsak',
+    subuh: 'Subuh',
+    terbit: 'Terbit',
+    dhuha: 'Dhuha',
+    dzuhur: 'Dzuhur',
+    ashar: 'Ashar',
+    maghrib: 'Maghrib',
+    isya: 'Isya',
+  };
+
+  const explanations: Record<keyof PrayerTimeData, string> = {
+    imsak: 'Depag: 10 menit sblm Subuh (-20°), Tarjih: 10 menit sblm Subuh (-18°)',
+    subuh: 'Depag RI: Sudut fajar -20° vs Tarjih Muhammadiyah: Sudut fajar kontemporer -18° (selisih ~8 mnt)',
+    terbit: 'Depag: -1.0° vs Tarjih: -0.833° (refraksi & semidiameter matahari)',
+    dhuha: 'Ketinggian matahari sepenggalah (+4.5°)',
+    dzuhur: 'Matahari tergelincir (zawal) + pengaman waktu (ihtiyat)',
+    ashar: 'Panjang bayangan = tinggi benda + bayangan zawal (standar Shafi\'i)',
+    maghrib: 'Piringan atas matahari terbenam sempurna di ufuk barat + ihtiyat',
+    isya: 'Syafaq merah hilang di ufuk barat (sudut depresi -18°)',
+  };
+
+  const result = {} as Record<keyof PrayerTimeData, PrayerComparisonDetail>;
+
+  for (const k of keys) {
+    const [th, tm] = (tarjihTimes[k] || '00:00').split(':').map(Number);
+    const [dh, dm] = (depagTimes[k] || '00:00').split(':').map(Number);
+    const tMin = th * 60 + tm;
+    const dMin = dh * 60 + dm;
+    const diff = tMin - dMin;
+
+    let diffBadge = 'Sama';
+    if (diff > 0) {
+      diffBadge = `+${diff} mnt`;
+    } else if (diff < 0) {
+      diffBadge = `${diff} mnt`;
+    }
+
+    result[k] = {
+      key: k,
+      label: labels[k],
+      tarjihTime: tarjihTimes[k],
+      depagTime: depagTimes[k],
+      diffMinutes: diff,
+      diffBadge,
+      depagDisplay: `+ Depag: ${depagTimes[k]}`,
+      explanation: explanations[k],
+    };
+  }
+
+  return result;
+}
+
+/**
  * Calculates precision Qibla Azimuth & distance to Ka'bah using Spherical Great-Circle formulas.
  */
 export function calculateQibla(latitude: number, longitude: number): QiblaInfo {
